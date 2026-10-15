@@ -21,6 +21,7 @@ struct Vocabulary: Equatable {
     init(text: String) {
         var terms: [String] = []
         var rules: [Rule] = []
+        var ruleTargets: [String] = []
         var seen = Set<String>()
         for rawLine in text.components(separatedBy: .newlines) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
@@ -30,11 +31,13 @@ struct Vocabulary: Equatable {
                 let correct = line[range.upperBound...].trimmingCharacters(in: .whitespaces)
                 guard !heard.isEmpty, !correct.isEmpty else { continue }
                 rules.append(Rule(heard: heard, correct: correct))
-                if seen.insert(correct.lowercased()).inserted { terms.append(correct) }
+                ruleTargets.append(correct)
             } else if seen.insert(line.lowercased()).inserted {
                 terms.append(line)
             }
         }
+        // Rule targets go last so `text` → `init(text:)` round-trips in the same order.
+        for target in ruleTargets where seen.insert(target.lowercased()).inserted { terms.append(target) }
         self.terms = terms
         self.rules = rules
     }
@@ -101,11 +104,14 @@ struct Vocabulary: Equatable {
         // camelCase / PascalCase boundaries: "ChatGPT" → "chat gpt", "iPhone" → "i phone"
         let split = term.replacingOccurrences(of: #"([a-z])([A-Z])"#, with: "$1 $2", options: .regularExpression)
             .replacingOccurrences(of: #"([A-Z]+)([A-Z][a-z])"#, with: "$1 $2", options: .regularExpression)
-            .lowercased()
-        variants.insert(split)
-        if term == term.uppercased(), term.count <= 6 {
-            variants.insert(term.lowercased().map(String.init).joined(separator: " "))  // "G P T"
-        }
+        variants.insert(split.lowercased())
+        // Acronyms are often heard letter by letter: "OKR" → "o k r", "ChatGPT" → "chat g p t"
+        let spelled = split.split(separator: " ").map { word -> String in
+            let w = String(word)
+            let isAcronym = w == w.uppercased() && w != w.lowercased() && w.count <= 6
+            return isAcronym ? w.lowercased().map(String.init).joined(separator: " ") : w.lowercased()
+        }.joined(separator: " ")
+        variants.insert(spelled)
         return variants.filter { !$0.isEmpty && $0.count >= 2 }.sorted { $0.count > $1.count }
     }
 

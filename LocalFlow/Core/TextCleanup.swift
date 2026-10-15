@@ -17,8 +17,8 @@ enum TextCleanup {
         if options.removeFillers { text = removeFillers(text) }
         if options.collapseStutters { text = collapseStutters(text) }
         if options.voiceCommands { text = applyVoiceCommands(text) }
-        text = normalizeWhitespace(text)
         text = fixPunctuationSpacing(text)
+        text = normalizeWhitespace(text)
         text = capitalizeSentences(text)
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -35,10 +35,28 @@ enum TextCleanup {
     /// "I, um, think" → "I think"; "Um, so" → "So". Only whole words, with any punctuation glued to the filler.
     static func removeFillers(_ text: String) -> String {
         let words = fillerWords.sorted { $0.count > $1.count }.joined(separator: "|")
-        // Optional leading punctuation/space, the filler, optional trailing punctuation. A following space is kept once.
-        let pattern = #"(?i)(^|[\s,;:—–-]+)(?:"# + words + #")(?=[\s,.!?;:—–-]|$)[,;:—–-]?(?=\s|$|[.!?])"#
-        var out = text.replacingOccurrences(of: pattern, with: "$1", options: .regularExpression)
-        // ", ," or " ,"
+        // Group 1: what comes before the filler (start or space/punctuation). Group 2: punctuation glued to its end.
+        let pattern = #"(?i)(^|[\s,;:—–-]+)(?:"# + words + #")(?=[\s,.!?;:—–-]|$)(\.{2,}|…|[,;:—–-]|[.!?])?(?=\s|$|[.!?])"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        let ns = text as NSString
+        var out = ""
+        var cursor = 0
+        for match in regex.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            let lead = ns.substring(with: match.range(at: 1))
+            let trail = match.range(at: 2).location == NSNotFound ? "" : ns.substring(with: match.range(at: 2))
+            let endsSentence = trail.count == 1 && ".!?".contains(trail)
+            if trail.isEmpty {
+                out += lead  // "and, uh asked" → "and, asked"
+            } else if endsSentence {
+                // "ok. um. fine" → "ok. fine"; "I think um." → "I think."
+                let before = out.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let last = before.last, !".!?".contains(last) { out += trail }
+            }
+            // otherwise ", uh," / "Um," / "uhh..." disappear entirely
+            cursor = match.range.location + match.range.length
+        }
+        out += ns.substring(from: cursor)
         out = out.replacingOccurrences(of: #"\s*,\s*,"#, with: ",", options: .regularExpression)
         out = out.replacingOccurrences(of: #"^\s*[,;:]\s*"#, with: "", options: .regularExpression)
         out = out.replacingOccurrences(of: #"([.!?])\s*[,;:]\s*"#, with: "$1 ", options: .regularExpression)
@@ -47,25 +65,25 @@ enum TextCleanup {
 
     /// "I I think the the fix" → "I think the fix". Only short words repeat as stutters; "had had" is left alone.
     static func collapseStutters(_ text: String) -> String {
-        text.replacingOccurrences(of: #"(?i)\b([A-Za-z']{1,3})(?:[,\s]+\1\b)+"#, with: "$1", options: .regularExpression)
+        text.replacingOccurrences(of: #"(?i)\b(?!had\b)([A-Za-z']{1,3})(?:[,\s]+\1\b)+"#, with: "$1", options: .regularExpression)
     }
 
-    /// Spoken "new line" / "new paragraph" become line breaks when they stand alone between punctuation.
+    /// Spoken "new line" / "new paragraph" become line breaks; punctuation before them stays, punctuation glued after goes.
     static func applyVoiceCommands(_ text: String) -> String {
-        var out = text.replacingOccurrences(of: #"(?i)[,.;:]?\s*\bnew paragraph\b[,.;:]?\s*"#, with: "\n\n", options: .regularExpression)
-        out = out.replacingOccurrences(of: #"(?i)[,.;:]?\s*\bnew line\b[,.;:]?\s*"#, with: "\n", options: .regularExpression)
+        var out = text.replacingOccurrences(of: #"(?i)\s*\bnew paragraph\b[,.;:]?\s*"#, with: "\n\n", options: .regularExpression)
+        out = out.replacingOccurrences(of: #"(?i)\s*\bnew line\b[,.;:]?\s*"#, with: "\n", options: .regularExpression)
         return out
     }
 
     static func normalizeWhitespace(_ text: String) -> String {
-        var out = text.replacingOccurrences(of: #"[ \t\u{00A0}]+"#, with: " ", options: .regularExpression)
+        var out = text.replacingOccurrences(of: #"[ \t\x{00A0}]+"#, with: " ", options: .regularExpression)
         out = out.replacingOccurrences(of: #" *\n *"#, with: "\n", options: .regularExpression)
         out = out.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
         return out
     }
 
     static func fixPunctuationSpacing(_ text: String) -> String {
-        var out = text.replacingOccurrences(of: #"\s+([,.!?;:])"#, with: "$1", options: .regularExpression)
+        var out = text.replacingOccurrences(of: #"[ \t]+([,.!?;:])"#, with: "$1", options: .regularExpression)
         out = out.replacingOccurrences(of: #"([,;:])(?=[A-Za-z])"#, with: "$1 ", options: .regularExpression)
         out = out.replacingOccurrences(of: #"([.!?])(?=[A-Z])"#, with: "$1 ", options: .regularExpression)
         return out
