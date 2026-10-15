@@ -53,7 +53,9 @@ struct Vocabulary: Equatable {
     func promptHint(limit: Int = 80) -> String {
         let picked = Array(terms.prefix(limit))
         guard !picked.isEmpty else { return "" }
-        return "Vocabulary: " + picked.joined(separator: ", ") + "."
+        // A plain spoken sentence, not a bare list: a comma list of capitalized terms biases Whisper into Title Case.
+        let list = picked.count > 1 ? picked.dropLast().joined(separator: ", ") + " and " + picked.last! : picked[0]
+        return "Okay, so here are some names and terms I use a lot: " + list + ". Let's get started."
     }
 
     /// Terms safe for keyword/keyterm API fields (ElevenLabs: ≤5 words, <50 chars, no brackets).

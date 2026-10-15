@@ -84,9 +84,12 @@ struct DictationBarView: View {
         case .done(let text):
             HStack(spacing: 10) {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                Text(text).font(.system(size: 13)).lineLimit(2).truncationMode(.tail)
-                if let warning = controller.lastWarning {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow).help(warning)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(text).font(.system(size: 13)).lineLimit(2).truncationMode(.tail)
+                    if let warning = controller.lastWarning {
+                        Label(warning, systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                    }
                 }
             }
         case .failed(let message):
