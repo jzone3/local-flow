@@ -48,7 +48,7 @@ expect(vocab.applySpelling(to: "the o k r and okr"), "the OKR and OKR", "acronym
 expect(vocab.applySpelling(to: "ask jay zed"), "ask JZ", "explicit rule")
 expect(vocab.applySpelling(to: "local flow and local-flow"), "Local Flow and Local Flow", "multi-word")
 expect(vocab.applySpelling(to: "devinsdinner"), "devinsdinner", "no partial word match")
-expect(vocab.promptHint(limit: 3), "Vocabulary: GitHub, ChatGPT, Next.js.", "prompt hint")
+expect(vocab.promptHint(limit: 3), "Okay, so here are some names and terms I use a lot: GitHub, ChatGPT and Next.js. Let's get started.", "prompt hint")
 expect(Vocabulary(text: vocab.text) == vocab, "round trip")
 expect(!Vocabulary(text: Vocabulary.defaultText).terms.isEmpty, "default list parses")
 expect(vocab.keyterms().contains("Local Flow"), "keyterms")
