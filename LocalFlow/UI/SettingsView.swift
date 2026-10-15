@@ -124,18 +124,25 @@ struct CloudSettings: View {
                 Link("Get a key", destination: provider.keyURL)
             }
             .font(.caption)
-            .id(keyChanged)
             EnvironmentKeyPicker(provider: provider) { keyChanged += 1 }
+                .id("\(provider.rawValue)-\(keyChanged)")
         }
         .onChange(of: settings.cloudProviderID) { _, _ in key = "" }
     }
 }
 
-/// Offers keys found in the shell environment for the selected provider.
+/// Offers keys found in the shell environment for the selected provider. The scan happens in `init` because
+/// `onAppear` never fires on an empty `ForEach`; the parent re-creates the view (`.id`) when the key or provider changes.
 struct EnvironmentKeyPicker: View {
     let provider: CloudProviderID
-    var onUse: () -> Void = {}
-    @State private var found: [EnvironmentKeys.Found] = []
+    var onUse: () -> Void
+    @State private var found: [EnvironmentKeys.Found]
+
+    init(provider: CloudProviderID, onUse: @escaping () -> Void = {}) {
+        self.provider = provider
+        self.onUse = onUse
+        _found = State(initialValue: Self.scan(for: provider))
+    }
 
     var body: some View {
         ForEach(found, id: \.name) { item in
@@ -146,14 +153,12 @@ struct EnvironmentKeyPicker: View {
                     .controlSize(.small)
             }
         }
-        .onAppear { scan() }
-        .onChange(of: provider) { _, _ in scan() }
     }
 
-    private func scan() {
-        guard provider.apiKey == nil else { found = []; return }
+    private static func scan(for provider: CloudProviderID) -> [EnvironmentKeys.Found] {
+        guard provider.apiKey == nil else { return [] }
         let names = provider.environmentVariables
-        found = EnvironmentKeys.scan().filter { names.contains($0.name) }
+        return EnvironmentKeys.scan().filter { names.contains($0.name) }
     }
 }
 
