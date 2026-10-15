@@ -89,6 +89,7 @@ struct CloudSettings: View {
     @ObservedObject private var settings = AppSettings.shared
     @State private var key = ""
     @State private var saved = false
+    @State private var keyChanged = 0  // bumps so the "Key stored" line re-reads the Keychain
 
     private var provider: CloudProviderID { settings.cloudProvider }
 
@@ -107,6 +108,7 @@ struct CloudSettings: View {
                 Button(saved ? "Saved" : "Save") {
                     Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: provider.keychainAccount)
                     saved = true
+                    keyChanged += 1
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { saved = false }
                 }
                 .disabled(key.isEmpty)
@@ -114,7 +116,7 @@ struct CloudSettings: View {
             HStack {
                 if provider.apiKey != nil {
                     Label("Key stored in your Keychain", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    Button("Remove") { Keychain.delete(provider.keychainAccount); key = "" }
+                    Button("Remove") { Keychain.delete(provider.keychainAccount); key = ""; keyChanged += 1 }
                 } else {
                     Label("No key saved", systemImage: "key").foregroundStyle(.secondary)
                 }
@@ -122,7 +124,8 @@ struct CloudSettings: View {
                 Link("Get a key", destination: provider.keyURL)
             }
             .font(.caption)
-            EnvironmentKeyPicker(provider: provider)
+            .id(keyChanged)
+            EnvironmentKeyPicker(provider: provider) { keyChanged += 1 }
         }
         .onChange(of: settings.cloudProviderID) { _, _ in key = "" }
     }
@@ -131,6 +134,7 @@ struct CloudSettings: View {
 /// Offers keys found in the shell environment for the selected provider.
 struct EnvironmentKeyPicker: View {
     let provider: CloudProviderID
+    var onUse: () -> Void = {}
     @State private var found: [EnvironmentKeys.Found] = []
 
     var body: some View {
@@ -138,7 +142,7 @@ struct EnvironmentKeyPicker: View {
             HStack {
                 Text("Found \(item.name) in \(item.source) (\(EnvironmentKeys.masked(item.value)))").font(.caption)
                 Spacer()
-                Button("Use it") { Keychain.set(item.value, for: provider.keychainAccount); found = [] }
+                Button("Use it") { Keychain.set(item.value, for: provider.keychainAccount); found = []; onUse() }
                     .controlSize(.small)
             }
         }
