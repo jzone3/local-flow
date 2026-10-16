@@ -131,7 +131,7 @@ final class DictationController: ObservableObject {
             do {
                 let outcome = try await TranscriptionService().transcribe(samples: samples)
                 guard !Task.isCancelled else { return }
-                lastWarning = outcome.warning
+                lastWarning = outcome.warning.map(Self.friendly)
                 if outcome.text.isEmpty {
                     show(failure: "Didn't catch anything.")
                     try? FileManager.default.removeItem(at: audioURL)
@@ -165,8 +165,18 @@ final class DictationController: ObservableObject {
         bar.hide()
     }
 
+    /// Server errors arrive as raw JSON bodies; the bar shows one plain line instead.
+    static func friendly(_ message: String) -> String {
+        var text = message
+        if let brace = text.firstIndex(where: { $0 == "{" || $0 == "<" }) { text = String(text[..<brace]) }
+        text = text.trimmingCharacters(in: CharacterSet(charactersIn: " :-\n\t"))
+        if text.count < 8 { text = "Transcription failed. Check your key in Settings." }
+        if text.count > 120 { text = String(text.prefix(117)) + "…" }
+        return text
+    }
+
     private func show(failure: String) {
-        state = .failed(failure)
+        state = .failed(Self.friendly(failure))
         bar.show()
         scheduleHide(after: 4)
     }

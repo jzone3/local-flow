@@ -44,10 +44,14 @@ final class AudioRecorder: ObservableObject {
             throw NSError(domain: "LocalFlow.Audio", code: 1, userInfo: [NSLocalizedDescriptionKey: "No microphone is available."])
         }
         let outputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Self.sampleRate, channels: 1, interleaved: false)!
-        converter = AVAudioConverter(from: inputFormat, to: outputFormat)
+        // Mix every input channel down to mono ourselves (the converter would only keep channel 0, so a mic
+        // on input 2 of an interface or a multi-channel virtual device would record silence).
+        let monoFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: inputFormat.sampleRate, channels: 1, interleaved: false)!
+        converter = AVAudioConverter(from: monoFormat, to: outputFormat)
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            self?.consume(buffer, outputFormat: outputFormat)
+            guard let self, let mono = Self.mixedToMono(buffer, format: monoFormat) else { return }
+            self.consume(mono, outputFormat: outputFormat)
         }
         engine.prepare()
         try engine.start()
@@ -66,8 +70,8 @@ final class AudioRecorder: ObservableObject {
         guard format.sampleRate > 0, format.channelCount > 0 else { monitoring = false; return }
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
-            guard let self, let data = buffer.floatChannelData, buffer.frameLength > 0 else { return }
-            let chunk = UnsafeBufferPointer(start: data[0], count: Int(buffer.frameLength))
+            guard let self, let mono = Self.mixedToMono(buffer), let data = mono.floatChannelData, mono.frameLength > 0 else { return }
+            let chunk = UnsafeBufferPointer(start: data[0], count: Int(mono.frameLength))
             let rms = sqrt(chunk.reduce(0) { $0 + $1 * $1 } / Float(chunk.count))
             let normalized = min(1, max(0, (20 * log10(max(rms, 1e-6)) + 50) / 50))
             DispatchQueue.main.async { self.monitorLevel = self.monitorLevel * 0.5 + normalized * 0.5 }
@@ -133,6 +137,32 @@ final class AudioRecorder: ObservableObject {
             self.levels.removeFirst()
             self.levels.append(self.level)
         }
+    }
+
+    /// Averages all channels of `buffer` into a mono buffer at the same sample rate.
+    static func mixedToMono(_ buffer: AVAudioPCMBuffer, format: AVAudioFormat? = nil) -> AVAudioPCMBuffer? {
+        let frames = Int(buffer.frameLength)
+        let channels = Int(buffer.format.channelCount)
+        guard frames > 0, channels > 0, let src = buffer.floatChannelData else { return nil }
+        let monoFormat = format ?? AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: buffer.format.sampleRate, channels: 1, interleaved: false)!
+        guard let out = AVAudioPCMBuffer(pcmFormat: monoFormat, frameCapacity: AVAudioFrameCount(frames)), let dst = out.floatChannelData else { return nil }
+        out.frameLength = AVAudioFrameCount(frames)
+        if buffer.format.isInterleaved {
+            let interleaved = src[0]
+            for i in 0..<frames {
+                var sum: Float = 0
+                for c in 0..<channels { sum += interleaved[i * channels + c] }
+                dst[0][i] = sum / Float(channels)
+            }
+        } else {
+            let scale = 1 / Float(channels)
+            for i in 0..<frames {
+                var sum: Float = 0
+                for c in 0..<channels { sum += src[c][i] }
+                dst[0][i] = sum * scale
+            }
+        }
+        return out
     }
 
     /// 16-bit PCM WAV, the format every provider accepts.
