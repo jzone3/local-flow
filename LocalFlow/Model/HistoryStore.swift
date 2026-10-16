@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -24,9 +25,22 @@ final class HistoryStore: ObservableObject {
         self.directory = directory
         indexURL = directory.appendingPathComponent("history.json")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        excludeFromBackups()
         load()
         purge()
         purgeTimer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { [weak self] _ in self?.purge() }
+        for name in [NSApplication.didBecomeActiveNotification, NSWorkspace.didWakeNotification] {
+            let center = name == NSWorkspace.didWakeNotification ? NSWorkspace.shared.notificationCenter : NotificationCenter.default
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.purge() }
+        }
+    }
+
+    /// Time Machine would otherwise keep copies of recordings long after the app deleted them.
+    private func excludeFromBackups() {
+        var dir = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? dir.setResourceValues(values)
     }
 
     func audioURL(for entry: HistoryEntry) -> URL? {

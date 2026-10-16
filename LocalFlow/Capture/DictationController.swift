@@ -91,7 +91,7 @@ final class DictationController: ObservableObject {
         let entryID = UUID()
         let audioURL = HistoryStore.shared.newAudioURL(id: entryID)
         let wav = AudioRecorder.wavData(from: samples)
-        try? wav.write(to: audioURL, options: .atomic)
+        try? wav.write(to: audioURL, options: [.atomic, .completeFileProtection])
 
         transcription = Task { [weak self] in
             guard let self else { return }

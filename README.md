@@ -53,7 +53,8 @@ Local engines work the same way: `LocalWhisper` is just another `TranscriptionPr
 - Local mode: audio and text never leave the Mac.
 - Cloud mode: only the audio clip and the dictionary hint go to the provider you chose, using your key (stored in the Keychain).
 - Cleanup and spelling fixes are deterministic and on-device. There is no LLM cleanup pass.
-- History (`~/Library/Application Support/Local Flow/History`) is purged every few minutes; nothing older than 12 hours survives, including orphaned audio files.
+- History (`~/Library/Application Support/Local Flow/History`) is one `history.json` plus one `.wav` per dictation, nothing else. Delete removes the files right away; the 12-hour purge runs at launch, every 5 minutes, on wake and whenever the app comes to the front, and also removes orphaned audio. The folder is excluded from Time Machine so backups never keep a copy.
+- Transcripts are pasted through the pasteboard, which is restored 0.6 s later; a third-party clipboard manager could still record them, as with any dictation app.
 
 ## Release
 

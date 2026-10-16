@@ -28,6 +28,7 @@ struct HistoryView: View {
             }
             .padding(12)
         }
+        .onAppear { history.purge() }
     }
 }
 
