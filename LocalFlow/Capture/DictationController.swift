@@ -168,7 +168,12 @@ final class DictationController: ObservableObject {
     /// Server errors arrive as raw JSON bodies; the bar shows one plain line instead.
     static func friendly(_ message: String) -> String {
         var text = message
-        if let brace = text.firstIndex(where: { $0 == "{" || $0 == "<" }) { text = String(text[..<brace]) }
+        for pattern in ["\\{.*\\}", "<.*>"] {   // drop a JSON object or HTML block but keep the sentence around it
+            text = text.replacingOccurrences(of: pattern, with: "", options: [.regularExpression])
+        }
+        text = text.replacingOccurrences(of: "\\s*:\\s*\\)", with: ")", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\\(\\s*\\)", with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
         text = text.trimmingCharacters(in: CharacterSet(charactersIn: " :-\n\t"))
         if text.count < 8 { text = "Transcription failed. Check your key in Settings." }
         if text.count > 120 { text = String(text.prefix(117)) + "…" }

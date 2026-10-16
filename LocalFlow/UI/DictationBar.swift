@@ -29,6 +29,8 @@ final class DictationBarPanel: NSPanel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 DispatchQueue.main.async { if self?.isVisible == true { self?.position() } }
+                // …and once more after the spring animation has settled, since fittingSize mid-animation is too small.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { if self?.isVisible == true { self?.position() } }
             }
     }
 

@@ -37,7 +37,10 @@ enum TranscriptionError: LocalizedError {
         switch self {
         case .noAPIKey(let provider): return "No API key for \(provider). Add one in Settings → Transcription."
         case .http(let status, let body):
-            let detail = body.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160)
+            // Bodies are usually JSON or an HTML error page; neither belongs in the bar.
+            var detail = String(body.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160))
+            if detail.hasPrefix("{") || detail.hasPrefix("<") || detail.hasPrefix("[") { detail = "" }
+            if status == 401 || status == 403 { detail = "the API key was rejected" }
             return "Server error \(status)" + (detail.isEmpty ? "" : ": \(detail)")
         case .network(let error): return error.localizedDescription
         case .badResponse(let why): return "Unexpected response: \(why)"
