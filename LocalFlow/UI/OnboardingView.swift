@@ -102,6 +102,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).fontWeight(.medium)
                 Text(detail).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)  // wrap instead of truncating in the fixed-size window
             }
             Spacer(minLength: 12)
             trailing()
