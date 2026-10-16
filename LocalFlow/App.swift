@@ -58,7 +58,7 @@ final class WindowManager {
     static let shared = WindowManager()
     private var windows: [String: NSWindow] = [:]
 
-    func showSettings() { show("settings", title: "Local Flow Settings", size: NSSize(width: 720, height: 600)) { SettingsView() } }
+    func showSettings() { show("settings", title: "Local Flow Settings", size: NSSize(width: 820, height: 600)) { SettingsView() } }
     func showHistory() { show("history", title: "History", size: NSSize(width: 560, height: 480)) { HistoryView() } }
     func showLastTranscript() { show("last", title: "Last Transcript", size: NSSize(width: 460, height: 260)) { LastTranscriptView() } }
     func showOnboarding() {
