@@ -34,11 +34,22 @@ struct GlassButton: ViewModifier {
     }
 }
 
-/// Translucent window backdrop so the glass controls have something to refract.
-struct WindowBackground: NSViewRepresentable {
+/// See-through window backdrop. On macOS 26 the whole window is a sheet of Liquid Glass (the window itself is
+/// transparent, see `WindowManager`); older systems blur what is behind the window with a visual-effect view.
+struct WindowBackground: View {
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            Color.clear.glassEffect(.regular, in: .rect)
+        } else {
+            VisualEffect()
+        }
+    }
+}
+
+private struct VisualEffect: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .sidebar
+        view.material = .popover
         view.blendingMode = .behindWindow
         view.state = .active
         return view

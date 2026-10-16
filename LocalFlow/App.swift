@@ -70,6 +70,11 @@ final class WindowManager {
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: style, backing: .buffered, defer: false)
         window.title = title
         window.titlebarAppearsTransparent = true
+        if #available(macOS 26.0, *) {
+            // The content draws its own Liquid Glass sheet (`WindowBackground`), so the window must not paint behind it.
+            window.isOpaque = false
+            window.backgroundColor = .clear
+        }
         if fixed {
             window.titleVisibility = .hidden
             window.isMovableByWindowBackground = true
