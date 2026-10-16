@@ -39,3 +39,21 @@ struct ActionButton: ViewModifier {
         }
     }
 }
+
+/// The faintly tinted backdrop System Settings and Finder use (`underWindowBackground`): opaque enough to read,
+/// still picks up a hint of the desktop colour. Used behind every content window; the bar keeps its real glass.
+struct WindowMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .underWindowBackground
+        view.blendingMode = .behindWindow
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+}
+
+extension View {
+    func windowMaterial() -> some View { background(WindowMaterial().ignoresSafeArea()) }
+}

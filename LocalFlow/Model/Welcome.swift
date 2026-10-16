@@ -14,7 +14,7 @@ enum Welcome {
         guard !defaults.bool(forKey: shownKey) else { return next() }
         defaults.set(true, forKey: shownKey)
 
-        let host = NSHostingController(rootView: WelcomeView())
+        let host = NSHostingController(rootView: WelcomeView().windowMaterial())
         host.sizingOptions = [.preferredContentSize]
         let sheet = NSWindow(contentViewController: host)
         sheet.setContentSize(host.view.fittingSize)

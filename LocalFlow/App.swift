@@ -85,8 +85,8 @@ final class WindowManager {
         }
         window.isReleasedWhenClosed = false
         let root = fixed
-            ? AnyView(content())
-            : AnyView(content().frame(minWidth: size.width, minHeight: size.height))
+            ? AnyView(content().windowMaterial())
+            : AnyView(content().frame(minWidth: size.width, minHeight: size.height).windowMaterial())
         window.contentViewController = NSHostingController(rootView: root)
         window.center()
         window.makeKeyAndOrderFront(nil)
