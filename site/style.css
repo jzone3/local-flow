@@ -1,11 +1,11 @@
 :root {
   color-scheme: light dark;
   --fg: #111; --bg: #fff; --muted: #6b6b6b; --line: #e6e6e6;
-  --kbd: #ececec; --key: #fff; --key-edge: #d4d4d4; --key-down: #dcdcdc;
+  --key-line: #cfcfcf;
   --k: clamp(30px, 8vw, 46px);
 }
 @media (prefers-color-scheme: dark) {
-  :root { --fg: #f2f2f2; --bg: #0b0b0b; --muted: #9a9a9a; --line: #222; --kbd: #161616; --key: #222; --key-edge: #000; --key-down: #333; }
+  :root { --fg: #f2f2f2; --bg: #0b0b0b; --muted: #9a9a9a; --line: #222; --key-line: #333; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -35,7 +35,7 @@ kbd { font: inherit; font-size: 13px; padding: 1px 6px; border: 1px solid var(--
 /* keyboard: bottom-left corner of a Mac keyboard */
 .kbd {
   --gap: calc(var(--k) * 0.16);
-  border: 1px solid var(--line); border-right: 0; border-top: 0;
+  border: 1px solid var(--key-line); border-right: 0; border-top: 0;
   border-radius: 0 0 0 calc(var(--k) * 0.4);
   padding: calc(var(--gap) * 2) 0 calc(var(--gap) * 1.6) calc(var(--gap) * 1.6);
   display: flex; flex-direction: column; gap: var(--gap);
@@ -49,7 +49,7 @@ kbd { font: inherit; font-size: 13px; padding: 1px 6px; border: 1px solid var(--
 .key {
   flex: 0 0 auto; width: var(--k); height: var(--k);
   background: transparent; border-radius: calc(var(--k) * 0.18);
-  border: 1px solid var(--line);
+  border: 1px solid var(--key-line);
   display: flex; align-items: center; justify-content: center;
   font-size: calc(var(--k) * 0.3); font-weight: 500; color: var(--muted);
   transition: transform .12s ease, background .12s ease, color .12s ease;
