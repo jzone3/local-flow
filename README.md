@@ -1,5 +1,7 @@
 # Local Flow
 
+[![Built by Devin](https://raw.githubusercontent.com/club-cog/built-by-devin/main/badges/built-by-devin.svg)](https://devin.ai)
+
 Open-source, privacy-first dictation for the Mac. Hold a key, talk, let go — your words are typed wherever your cursor is.
 
 - **Hold to talk.** Fn by default; pick any key in Settings. Double-tap it to keep listening hands-free, tap again to stop. A small Liquid Glass bar shows a live waveform while you speak; the text goes straight to your cursor. Pick which microphone to use in Settings.
