@@ -1,0 +1,22 @@
+{
+  "images": [
+    {
+      "filename": "pack-product@1x.png",
+      "idiom": "universal",
+      "scale": "1x"
+    },
+    {
+      "filename": "pack-product@2x.png",
+      "idiom": "universal",
+      "scale": "2x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "properties": {
+    "template-rendering-intent": "template",
+    "preserves-vector-representation": false
+  }
+}

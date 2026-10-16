@@ -9,43 +9,43 @@ struct VocabularyPack: Identifiable, Equatable {
     let terms: [String]
 
     static let all: [VocabularyPack] = [
-        VocabularyPack(id: "engineering", name: "Software engineer", icon: "chevron.left.forwardslash.chevron.right", terms: [
+        VocabularyPack(id: "engineering", name: "Software engineer", icon: "pack-engineering", terms: [
             "React", "Node.js", "Rust", "Go", "Swift", "SwiftUI", "Xcode", "VS Code", "Docker", "AWS", "GCP", "Azure",
             "Terraform", "GraphQL", "REST", "OAuth", "JSON", "YAML", "CLI", "regex", "npm", "pnpm", "Git", "pull request",
             "refactor", "backend", "frontend", "DevOps", "Redis", "MongoDB", "Supabase", "Datadog", "Sentry", "webhook",
             "Linux", "Ubuntu", "Bash", "localhost", "Claude Code", "Copilot", "RAG", "MCP",
         ]),
-        VocabularyPack(id: "product", name: "Product & design", icon: "paintbrush.pointed", terms: [
+        VocabularyPack(id: "product", name: "Product & design", icon: "pack-product", terms: [
             "Miro", "roadmap", "PRD", "MVP", "user research", "wireframe", "Framer", "Webflow", "Storybook", "A/B test",
             "NPS", "DAU", "MAU", "Amplitude", "Mixpanel", "PostHog", "Hotjar", "Dovetail", "UX", "UI", "Lottie", "Sketch",
             "Zeplin", "onboarding", "design system", "Tailwind", "retention", "churn",
         ]),
-        VocabularyPack(id: "founder", name: "Founder & business", icon: "building.2", terms: [
+        VocabularyPack(id: "founder", name: "Founder & business", icon: "pack-founder", terms: [
             "Y Combinator", "YC", "SAFE", "cap table", "ARR", "MRR", "CAC", "LTV", "churn", "runway", "Series A",
             "seed round", "term sheet", "pitch deck", "board deck", "GTM", "go-to-market", "Carta", "Mercury", "Brex",
             "Ramp", "Gusto", "Rippling", "Deel", "QuickBooks", "EBITDA", "P&L", "B2B", "B2C", "PMF", "a16z", "Sequoia",
         ]),
-        VocabularyPack(id: "sales", name: "Sales & marketing", icon: "megaphone", terms: [
+        VocabularyPack(id: "sales", name: "Sales & marketing", icon: "pack-sales", terms: [
             "Apollo", "Outreach", "Gong", "ZoomInfo", "Clay", "SEO", "SEM", "CTA", "CRM", "ICP", "SDR", "AE", "pipeline",
             "quota", "MQL", "Mailchimp", "Klaviyo", "Google Ads", "Meta Ads", "Canva", "Webflow", "UTM", "CPC", "CTR",
             "ROAS", "Instagram", "Substack", "newsletter", "ABM", "upsell", "demo",
         ]),
-        VocabularyPack(id: "finance", name: "Finance & accounting", icon: "chart.line.uptrend.xyaxis", terms: [
+        VocabularyPack(id: "finance", name: "Finance & accounting", icon: "pack-finance", terms: [
             "EBITDA", "GAAP", "IFRS", "Excel", "QuickBooks", "NetSuite", "Xero", "Bloomberg", "S&P 500", "Nasdaq", "ETF",
             "IPO", "M&A", "DCF", "IRR", "NPV", "ROI", "YoY", "QoQ", "401(k)", "Roth IRA", "accrual", "amortization",
             "FP&A", "CFO", "CPA", "audit", "invoice", "payroll",
         ]),
-        VocabularyPack(id: "health", name: "Healthcare", icon: "cross.case", terms: [
+        VocabularyPack(id: "health", name: "Healthcare", icon: "pack-health", terms: [
             "HIPAA", "EHR", "EMR", "Epic", "Cerner", "ICD-10", "CPT", "PHI", "telehealth", "MRI", "CT scan", "ECG", "BMI",
             "PCP", "ER", "ICU", "triage", "prognosis", "diagnosis", "chronic", "acute", "pediatric", "oncology",
             "cardiology", "ibuprofen", "acetaminophen", "mg", "mL",
         ]),
-        VocabularyPack(id: "legal", name: "Legal", icon: "scale.3d", terms: [
+        VocabularyPack(id: "legal", name: "Legal", icon: "pack-legal", terms: [
             "NDA", "LLC", "C corp", "IP", "GDPR", "CCPA", "SOC 2", "MSA", "SOW", "DPA", "indemnification", "arbitration",
             "due diligence", "pro bono", "subpoena", "affidavit", "litigation", "plaintiff", "defendant", "counsel",
             "DocuSign", "Clio", "Westlaw", "LexisNexis", "jurisdiction", "statute",
         ]),
-        VocabularyPack(id: "student", name: "Student & research", icon: "graduationcap", terms: [
+        VocabularyPack(id: "student", name: "Student & research", icon: "pack-student", terms: [
             "GPA", "SAT", "ACT", "GRE", "MCAT", "LSAT", "PhD", "MBA", "thesis", "dissertation", "citation", "APA", "MLA",
             "Zotero", "Google Scholar", "arXiv", "Canvas", "Blackboard", "Coursera", "Khan Academy", "Grammarly",
             "Quizlet", "syllabus", "office hours", "TA", "peer review", "hypothesis",

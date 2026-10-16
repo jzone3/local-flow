@@ -13,14 +13,16 @@ struct PackPicker: View {
                     settings.setPack(pack.id, on: !on)
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: pack.icon)
-                            .font(.system(size: 13))
+                        Icon(pack.icon, size: 16)
                             .foregroundStyle(on ? Color.accentColor : .secondary)
                             .frame(width: 18)
                         Text(pack.name).lineLimit(1)
                         Spacer(minLength: 4)
-                        Image(systemName: on ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(on ? Color.accentColor : Color.secondary.opacity(0.5))
+                        if on {
+                            Icon("check-circle", size: 15).foregroundStyle(Color.accentColor)
+                        } else {
+                            Circle().strokeBorder(Color.secondary.opacity(0.45), lineWidth: 1).frame(width: 15, height: 15)
+                        }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
@@ -28,7 +30,8 @@ struct PackPicker: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .accessibilityAddTraits(on ? [.isSelected] : [])
+                .background(on ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(on ? Color.accentColor.opacity(0.7) : Color(nsColor: .separatorColor), lineWidth: on ? 1.5 : 1)

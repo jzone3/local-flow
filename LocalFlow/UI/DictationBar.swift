@@ -83,18 +83,18 @@ struct DictationBarView: View {
             }
         case .done(let text):
             HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Icon("check-circle", size: 16).foregroundStyle(.green)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(text).font(.system(size: 13)).lineLimit(2).truncationMode(.tail)
                     if let warning = controller.lastWarning {
-                        Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        Label { Text(warning) } icon: { Icon("warning", size: 11) }
                             .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
                     }
                 }
             }
         case .failed(let message):
             HStack(spacing: 10) {
-                Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
+                Icon("x-circle", size: 16).foregroundStyle(.red)
                 Text(message).font(.system(size: 13)).lineLimit(3)
             }
         case .idle:

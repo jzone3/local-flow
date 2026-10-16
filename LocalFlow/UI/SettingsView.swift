@@ -3,11 +3,11 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
-            GeneralSettings().tabItem { Label("General", systemImage: "gear") }
-            TranscriptionSettings().tabItem { Label("Transcription", systemImage: "waveform") }
-            DictionarySettings().tabItem { Label("Dictionary", systemImage: "character.book.closed") }
-            PrivacySettings().tabItem { Label("Privacy", systemImage: "lock") }
-            AboutSettings().tabItem { Label("About", systemImage: "info.circle") }
+            GeneralSettings().tabItem { Label { Text("General") } icon: { Image(nsImage: Icon.nsImage("gear", size: 16)) } }
+            TranscriptionSettings().tabItem { Label { Text("Transcription") } icon: { Image(nsImage: Icon.nsImage("waveform", size: 16)) } }
+            DictionarySettings().tabItem { Label { Text("Dictionary") } icon: { Image(nsImage: Icon.nsImage("book", size: 16)) } }
+            PrivacySettings().tabItem { Label { Text("Privacy") } icon: { Image(nsImage: Icon.nsImage("lock", size: 16)) } }
+            AboutSettings().tabItem { Label { Text("About") } icon: { Image(nsImage: Icon.nsImage("info", size: 16)) } }
         }
         .padding(20)
     }
@@ -29,7 +29,7 @@ struct GeneralSettings: View {
             }
             Section("Permissions") {
                 if let problem = controller.permissionProblem {
-                    Label(problem, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Label { Text(problem) } icon: { Icon("warning", size: 14) }.foregroundStyle(.orange)
                     HStack {
                         Button("Open Accessibility Settings") {
                             HotkeyMonitor.requestAccessibility()
@@ -42,7 +42,7 @@ struct GeneralSettings: View {
                     }
                     .actionButton()
                 } else {
-                    Label("Accessibility and microphone access granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Label { Text("Accessibility and microphone access granted") } icon: { Icon("check-circle", size: 14) }.foregroundStyle(.green)
                 }
             }
         }
@@ -119,11 +119,11 @@ struct CloudSettings: View {
             }
             HStack {
                 if provider.apiKey != nil {
-                    Label("Key stored in your Keychain", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+                    Label { Text("Key stored in your Keychain") } icon: { Icon("check-circle", size: 14) }.foregroundStyle(.green)
                     Button("Remove") { Keychain.delete(provider.keychainAccount); key = ""; keyChanged += 1 }
                         .actionButton().controlSize(.small)
                 } else {
-                    Label("No key saved", systemImage: "key").foregroundStyle(.secondary)
+                    Label { Text("No key saved") } icon: { Icon("key", size: 14) }.foregroundStyle(.secondary)
                 }
                 Spacer()
                 Link("Get a key", destination: provider.keyURL)
@@ -178,7 +178,7 @@ struct ModelList: View {
                     settings.localModelID = model.id
                     LocalWhisper.shared.preload()
                 } label: {
-                    Image(systemName: settings.localModelID == model.id ? "largecircle.fill.circle" : "circle")
+                    Radio(on: settings.localModelID == model.id)
                 }
                 .buttonStyle(.plain)
                 .disabled(!model.isDownloaded)
@@ -194,7 +194,7 @@ struct ModelList: View {
                     ProgressView(value: progress).frame(width: 90)
                     Button("Cancel") { downloader.cancel(model) }.actionButton().controlSize(.small)
                 } else if model.isDownloaded {
-                    Label("Downloaded", systemImage: "checkmark").font(.caption).foregroundStyle(.green)
+                    Label { Text("Downloaded") } icon: { Icon("check", size: 11) }.font(.caption).foregroundStyle(.green)
                     Button("Delete") { downloader.delete(model) }.actionButton().controlSize(.small)
                 } else {
                     Button("Download") { downloader.download(model) }.actionButton(prominent: true).controlSize(.small)
@@ -256,7 +256,7 @@ struct DictionaryBuilderSheet: View {
             if let provider {
                 Text("Sent to \(provider.title) with your key.").font(.caption).foregroundStyle(.secondary)
             } else {
-                Label("Add an OpenAI or Gemini key in Transcription to get suggestions. You can still edit the list by hand.", systemImage: "info.circle")
+                Label { Text("Add an OpenAI or Gemini key in Transcription to get suggestions. You can still edit the list by hand.") } icon: { Icon("info", size: 14) }
                     .font(.caption).foregroundStyle(.secondary)
             }
             TextEditor(text: $answer)

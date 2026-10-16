@@ -79,8 +79,7 @@ struct OnboardingView: View {
     private func header(_ title: String, _ subtitle: String, icon: String? = nil) -> some View {
         VStack(spacing: 8) {
             if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 36, weight: .light))
+                Icon(icon, size: 40)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 8)
             }
@@ -94,8 +93,7 @@ struct OnboardingView: View {
 
     private func row(_ icon: String, _ title: String, _ detail: String, @ViewBuilder trailing: () -> some View = { EmptyView() }) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
+            Icon(icon, size: 20)
                 .foregroundStyle(.secondary)
                 .frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {
@@ -122,11 +120,11 @@ struct OnboardingView: View {
                 .shadow(color: .black.opacity(0.2), radius: 14, y: 8)
             header("Local Flow", "Hold a key, talk, let go.\nYour words appear wherever your cursor is.")
             VStack(spacing: 0) {
-                row("lock.shield", "Private by default", "Whisper runs on your Mac. Nothing leaves it unless you pick a cloud model.")
+                row("lock", "Private by default", "Whisper runs on your Mac. Nothing leaves it unless you pick a cloud model.")
                 rowDivider
-                row("clock.arrow.circlepath", "Nothing kept for long", "Transcripts and recordings are deleted after 12 hours.")
+                row("clock", "Nothing kept for long", "Transcripts and recordings are deleted after 12 hours.")
                 rowDivider
-                row("chevron.left.forwardslash.chevron.right", "Open source", "Add your own models and providers.")
+                row("code", "Open source", "Add your own models and providers.")
             }
             .card()
         }
@@ -134,7 +132,7 @@ struct OnboardingView: View {
 
     private var permissions: some View {
         VStack(spacing: 26) {
-            header("Two permissions", "macOS asks for these so Local Flow can hear you and type for you.", icon: "hand.raised")
+            header("Two permissions", "macOS asks for these so Local Flow can hear you and type for you.", icon: "hand")
             VStack(spacing: 0) {
                 permissionRow("mic", "Microphone", granted: AudioRecorder.hasPermission, detail: "To record while you hold the key.") {
                     Task { _ = await AudioRecorder.requestPermission(); controller.refreshPermissions() }
@@ -157,7 +155,7 @@ struct OnboardingView: View {
     private func permissionRow(_ icon: String, _ name: String, granted: Bool, detail: String, action: @escaping () -> Void) -> some View {
         row(icon, name, detail) {
             if granted {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.title3)
+                Icon("check-circle", size: 20).foregroundStyle(.green)
             } else {
                 Button("Allow", action: action).actionButton()
             }
@@ -209,7 +207,7 @@ struct OnboardingView: View {
 
     private var dictionary: some View {
         VStack(spacing: 20) {
-            header("What do you do?", "Pick any that apply. Each adds the names and jargon of that field\nto your dictionary, on top of the default list.", icon: "character.book.closed")
+            header("What do you do?", "Pick any that apply. Each adds the names and jargon of that field\nto your dictionary, on top of the default list.", icon: "book")
             PackPicker()
             VStack(spacing: 0) {
                 row("sparkles", "Or describe yourself", "One sentence about who you are and what you do; Local Flow suggests words from it. Needs an OpenAI or Gemini key. The answer is never saved.") {
@@ -224,19 +222,19 @@ struct OnboardingView: View {
 
     private var done: some View {
         VStack(spacing: 26) {
-            header("You're set", "Hold \(settings.hotkey.displayName) anywhere and start talking.", icon: "checkmark.circle")
+            header("You're set", "Hold \(settings.hotkey.displayName) anywhere and start talking.", icon: "check-circle")
             VStack(spacing: 0) {
                 row("keyboard", "Let go to paste", "Press Esc while holding to cancel.")
                 rowDivider
-                row("text.alignleft", "Breaks", "Say \"new paragraph\" or \"new line\".")
+                row("text-lines", "Breaks", "Say \"new paragraph\" or \"new line\".")
                 rowDivider
                 row("sparkles", "Cleanup is on", "Ums, caps and punctuation are fixed on this Mac. Turn it off in Settings → Privacy.")
                 rowDivider
-                row("menubar.rectangle", "Menu bar", "Settings, History and updates live there.")
+                row("menubar", "Menu bar", "Settings, History and updates live there.")
             }
             .card()
             if controller.permissionProblem != nil {
-                Label("A permission is still missing; the key won't work until it's granted.", systemImage: "exclamationmark.triangle.fill")
+                Label { Text("A permission is still missing; the key won't work until it's granted.") } icon: { Icon("warning", size: 14) }
                     .font(.callout).foregroundStyle(.orange)
             }
         }

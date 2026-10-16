@@ -20,7 +20,7 @@ struct LocalFlowApp: App {
             Button("Quit Local Flow") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
-            Image(systemName: controller.state.isActive ? "waveform.circle.fill" : "waveform")
+            Image(nsImage: Icon.nsImage(controller.state.isActive ? "waveform-circle" : "waveform", size: 18))
         }
     }
 }

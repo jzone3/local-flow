@@ -6,7 +6,7 @@ struct HistoryView: View {
     var body: some View {
         VStack(spacing: 0) {
             if history.entries.isEmpty {
-                ContentUnavailableView("Nothing yet", systemImage: "clock", description: Text("Dictations from the last 12 hours show up here, then disappear."))
+                ContentUnavailableView { Label { Text("Nothing yet") } icon: { Icon("history", size: 44).foregroundStyle(.secondary) } } description: { Text("Dictations from the last 12 hours show up here, then disappear.") }
                     .frame(maxHeight: .infinity)
             } else {
                 ScrollView {
