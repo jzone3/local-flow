@@ -79,6 +79,7 @@ private struct WelcomeView: View {
                 .padding(.leading, 12)
                 .padding(.top, 8)
         }
+        .ignoresSafeArea(.container, edges: .top)
     }
 
 }
