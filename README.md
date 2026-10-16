@@ -7,7 +7,7 @@ Open-source, privacy-first dictation for the Mac. Hold a key, talk, let go — y
 - **Or bring your own key.** OpenAI, ElevenLabs Scribe or Gemini, with retries and automatic fallback to the local model. Setup finds keys already in your shell environment.
 - **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup lets you add word packs for your field (engineering, product, sales, legal…).
 - **Cleanup that never leaves your Mac.** Ums and uhs, capitalisation, punctuation and "new paragraph" are handled with rules, not a model. On by default, one toggle to turn off.
-- **12-hour history.** Transcripts and recordings are stored only on your Mac and deleted after 12 hours.
+- **Short-lived history.** Transcripts and recordings stay on your Mac only while the app is running — wiped when you quit (and on launch), and never kept longer than 12 hours.
 - **Self-updating.** Checks GitHub Releases once a day and installs the new DMG in place.
 
 ## Install
@@ -36,7 +36,7 @@ LocalFlow/
   Core/                     TextCleanup, Vocabulary, EnvironmentKeys, Version — no AppKit, covered by Tests/
   Capture/                  HotkeyMonitor, AudioRecorder (16 kHz mono), TextInserter (paste), DictationController
   Transcription/            TranscriptionProvider protocol, LocalWhisper (+ model downloader), CloudProviders, TranscriptionService
-  Model/                    AppSettings, Keychain, HistoryStore (12 h purge), UpdateChecker
+  Model/                    AppSettings, Keychain, HistoryStore (wiped on quit, 12 h purge), UpdateChecker
   UI/                       DictationBar (Liquid Glass), Settings, Onboarding, History
 ```
 
@@ -53,7 +53,7 @@ Local engines work the same way: `LocalWhisper` is just another `TranscriptionPr
 - Local mode: audio and text never leave the Mac.
 - Cloud mode: only the audio clip and the dictionary hint go to the provider you chose, using your key (stored in the Keychain).
 - Cleanup and spelling fixes are deterministic and on-device. There is no LLM cleanup pass.
-- History (`~/Library/Application Support/Local Flow/History`) is one `history.json` plus one `.wav` per dictation, nothing else. Delete removes the files right away; the 12-hour purge runs at launch, every 5 minutes, on wake and whenever the app comes to the front, and also removes orphaned audio. The folder is excluded from Time Machine so backups never keep a copy.
+- History (`~/Library/Application Support/Local Flow/History`) is one `history.json` plus one `.wav` per dictation, nothing else. The whole folder is emptied when the app quits and again at launch (so a crash leaves nothing behind); Delete removes files right away; while running, the 12-hour purge runs every 5 minutes, on wake and whenever the app comes to the front, and also removes orphaned audio. The folder is excluded from Time Machine so backups never keep a copy.
 - Transcripts are pasted through the pasteboard, which is restored 0.6 s later; a third-party clipboard manager could still record them, as with any dictation app.
 
 ## Release

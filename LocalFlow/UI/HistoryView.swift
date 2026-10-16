@@ -6,7 +6,7 @@ struct HistoryView: View {
     var body: some View {
         VStack(spacing: 0) {
             if history.entries.isEmpty {
-                ContentUnavailableView { Label { Text("Nothing yet") } icon: { Icon("history", size: 44).foregroundStyle(.secondary) } } description: { Text("Dictations from the last 12 hours show up here, then disappear.") }
+                ContentUnavailableView { Label { Text("Nothing yet") } icon: { Icon("history", size: 44).foregroundStyle(.secondary) } } description: { Text("Dictations from this session show up here and are gone when you quit, or after 12 hours.") }
                     .frame(maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -20,7 +20,7 @@ struct HistoryView: View {
             }
             Divider()
             HStack {
-                Text("Kept on this Mac only. Auto-deleted after 12 hours.").font(.caption).foregroundStyle(.secondary)
+                Text("Kept on this Mac only. Gone when you quit, or after 12 hours.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Delete All", role: .destructive) { history.clear() }
                     .actionButton()

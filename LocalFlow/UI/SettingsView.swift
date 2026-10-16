@@ -242,10 +242,10 @@ struct PrivacySettings: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("History") {
-                Text("Transcripts and recordings are kept only on this Mac and deleted automatically 12 hours after each dictation.")
+                Text("Transcripts and recordings are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Text("\(history.entries.count) items in the last 12 hours")
+                    Text("\(history.entries.count) items this session")
                     Spacer()
                     Button("Show History") { WindowManager.shared.showHistory() }
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([history.directory]) }

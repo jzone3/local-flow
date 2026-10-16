@@ -120,7 +120,7 @@ struct OnboardingView: View {
             VStack(spacing: 0) {
                 row("lock", "Private by default", "Whisper runs on your Mac. Nothing leaves it unless you pick a cloud model.")
                 rowDivider
-                row("clock", "Nothing kept for long", "Transcripts and recordings are deleted after 12 hours.")
+                row("clock", "Nothing kept", "Transcripts and recordings are deleted when you quit, or after 12 hours.")
                 rowDivider
                 row("code", "Open source", "Add your own models and providers.")
             }

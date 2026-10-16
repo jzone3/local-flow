@@ -12,7 +12,8 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
     var audioFileName: String?
 }
 
-/// Transcripts and their recordings, kept only on this Mac and deleted 12 hours after they were made.
+/// Transcripts and their recordings: kept only on this Mac, only while the app is running (wiped on quit and on
+/// launch), and never longer than 12 hours.
 final class HistoryStore: ObservableObject {
     static let shared = HistoryStore()
 
@@ -26,13 +27,22 @@ final class HistoryStore: ObservableObject {
         indexURL = directory.appendingPathComponent("history.json")
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         excludeFromBackups()
-        load()
-        purge()
+        wipe()
         purgeTimer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { [weak self] _ in self?.purge() }
         for name in [NSApplication.didBecomeActiveNotification, NSWorkspace.didWakeNotification] {
             let center = name == NSWorkspace.didWakeNotification ? NSWorkspace.shared.notificationCenter : NotificationCenter.default
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.purge() }
         }
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.wipe()
+        }
+    }
+
+    /// Removes everything in the History folder, index included. Called on launch and on quit.
+    func wipe() {
+        entries = []
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        files.forEach { try? FileManager.default.removeItem(at: $0) }
     }
 
     /// Time Machine would otherwise keep copies of recordings long after the app deleted them.
@@ -96,12 +106,6 @@ final class HistoryStore: ObservableObject {
         return urls.filter { $0.pathExtension == "wav" }.map {
             ($0, try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
         }
-    }
-
-    private func load() {
-        guard let data = try? Data(contentsOf: indexURL),
-              let decoded = try? JSONDecoder().decode([HistoryEntry].self, from: data) else { return }
-        entries = decoded.sorted { $0.date > $1.date }
     }
 
     private func save() {
