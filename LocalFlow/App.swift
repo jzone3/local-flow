@@ -65,8 +65,9 @@ final class WindowManager {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        var style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable]
-        if fixed { style.insert(.fullSizeContentView) } else { style.insert(.resizable) }
+        // Full-size content on every window so one glass sheet spans the title bar and the body.
+        var style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+        if !fixed { style.insert(.resizable) }
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: style, backing: .buffered, defer: false)
         window.title = title
         window.titlebarAppearsTransparent = true
@@ -80,7 +81,9 @@ final class WindowManager {
             window.isMovableByWindowBackground = true
         }
         window.isReleasedWhenClosed = false
-        let root = fixed ? AnyView(content()) : AnyView(content().frame(minWidth: size.width, minHeight: size.height))
+        let root = fixed
+            ? AnyView(content())
+            : AnyView(content().frame(minWidth: size.width, minHeight: size.height).ignoresSafeArea(edges: []))
         window.contentViewController = NSHostingController(rootView: root)
         window.center()
         window.makeKeyAndOrderFront(nil)

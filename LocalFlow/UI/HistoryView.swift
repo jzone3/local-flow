@@ -28,6 +28,7 @@ struct HistoryView: View {
             }
             .padding(12)
         }
+        .padding(.top, 28)
         .background(WindowBackground().ignoresSafeArea())
     }
 }

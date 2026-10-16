@@ -12,7 +12,8 @@ struct GlassCard: ViewModifier {
 
     func body(content: Content) -> some View {
         if #available(macOS 26.0, *) {
-            content.glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+            // A little body so what is behind the window does not muddy the card's contents.
+            content.glassEffect(.regular.tint(Color(nsColor: .windowBackgroundColor).opacity(0.5)), in: .rect(cornerRadius: cornerRadius))
         } else {
             content
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
