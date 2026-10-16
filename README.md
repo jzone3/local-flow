@@ -5,7 +5,7 @@ Open-source, privacy-first dictation for the Mac. Hold a key, talk, let go — y
 - **Hold to talk.** Fn by default; pick any key in Settings. A small Liquid Glass bar shows while you speak.
 - **Local by default.** Whisper (whisper.cpp with Metal) runs on your Mac. Download the model you want — large-v3-turbo is recommended.
 - **Or bring your own key.** OpenAI, ElevenLabs Scribe or Gemini, with retries and automatic fallback to the local model. Setup finds keys already in your shell environment.
-- **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup can suggest terms from a one-off "who are you / what do you do" answer that is never saved.
+- **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup lets you add word packs for your field (engineering, product, sales, legal…).
 - **Cleanup that never leaves your Mac.** Ums and uhs, capitalisation, punctuation and "new paragraph" are handled with rules, not a model. On by default, one toggle to turn off.
 - **12-hour history.** Transcripts and recordings are stored only on your Mac and deleted after 12 hours.
 - **Self-updating.** Checks GitHub Releases once a day and installs the new DMG in place.
@@ -54,7 +54,6 @@ Local engines work the same way: `LocalWhisper` is just another `TranscriptionPr
 - Cloud mode: only the audio clip and the dictionary hint go to the provider you chose, using your key (stored in the Keychain).
 - Cleanup and spelling fixes are deterministic and on-device. There is no LLM cleanup pass.
 - History (`~/Library/Application Support/Local Flow/History`) is purged every few minutes; nothing older than 12 hours survives, including orphaned audio files.
-- The dictionary-builder answer is sent once to your configured provider and not written anywhere.
 
 ## Release
 

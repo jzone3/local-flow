@@ -9,7 +9,6 @@ struct OnboardingView: View {
     @ObservedObject private var downloader = ModelDownloader.shared
     @State private var step = 0
     @State private var foundKeys: [EnvironmentKeys.Found] = []
-    @State private var showBuilder = false
 
     private let stepCount = 5
 
@@ -35,7 +34,6 @@ struct OnboardingView: View {
         .frame(width: Self.windowSize.width, height: Self.windowSize.height)
         .animation(.easeInOut(duration: 0.2), value: step)
         .onAppear { foundKeys = EnvironmentKeys.scan() }
-        .sheet(isPresented: $showBuilder) { DictionaryBuilderSheet(onDone: { showBuilder = false }) }
     }
 
     // MARK: Footer
@@ -209,12 +207,6 @@ struct OnboardingView: View {
         VStack(spacing: 20) {
             header("What do you do?", "Pick any that apply. Each adds the names and jargon of that field\nto your dictionary, on top of the default list.", icon: "book")
             PackPicker()
-            VStack(spacing: 0) {
-                row("sparkles", "Or describe yourself", "One sentence about who you are and what you do; Local Flow suggests words from it. Needs an OpenAI or Gemini key. The answer is never saved.") {
-                    Button("Answer…") { showBuilder = true }.actionButton()
-                }
-            }
-            .card()
             Text("\(settings.vocabulary.terms.count) terms. Edit any time in Settings → Dictionary.")
                 .font(.caption).foregroundStyle(.secondary)
         }

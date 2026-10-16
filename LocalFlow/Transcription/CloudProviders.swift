@@ -55,9 +55,6 @@ enum CloudProviderID: String, CaseIterable, Identifiable {
 
     var apiKey: String? { Keychain.get(keychainAccount) }
 
-    /// Whether this provider can also answer a text prompt (used to suggest dictionary terms during setup).
-    var supportsTextGeneration: Bool { self != .elevenLabs }
-
     func makeProvider(model: String) -> TranscriptionProvider {
         switch self {
         case .openAI: return OpenAITranscriber(model: model)
@@ -159,33 +156,5 @@ enum Gemini {
             throw TranscriptionError.badResponse("no candidates")
         }
         return parts.compactMap { $0["text"] as? String }.joined()
-    }
-}
-
-/// Plain text completion from the user's configured provider, used only for the setup dictionary suggestion.
-enum TextGeneration {
-    static func complete(prompt: String, provider: CloudProviderID) async throws -> String {
-        guard let key = provider.apiKey else { throw TranscriptionError.noAPIKey(provider.title) }
-        switch provider {
-        case .openAI:
-            var req = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
-            req.httpMethod = "POST"
-            req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.httpBody = try JSONSerialization.data(withJSONObject: [
-                "model": "gpt-4o-mini", "temperature": 0.3,
-                "messages": [["role": "user", "content": prompt]],
-            ])
-            let (data, _) = try await HTTP.send(req)
-            guard let choices = try HTTP.json(data)["choices"] as? [[String: Any]],
-                  let message = choices.first?["message"] as? [String: Any],
-                  let text = message["content"] as? String else { throw TranscriptionError.badResponse("missing content") }
-            return text
-        case .gemini:
-            return try await Gemini.generate(body: ["contents": [["parts": [["text": prompt]]]], "generationConfig": ["temperature": 0.3]],
-                                             model: "gemini-3.5-flash", key: key)
-        case .elevenLabs:
-            throw TranscriptionError.badResponse("ElevenLabs has no text model")
-        }
     }
 }

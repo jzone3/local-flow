@@ -207,7 +207,6 @@ struct ModelList: View {
 
 struct DictionarySettings: View {
     @ObservedObject private var settings = AppSettings.shared
-    @State private var showBuilder = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -222,97 +221,11 @@ struct DictionarySettings: View {
             HStack {
                 Text("\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Suggest Terms for Me…") { showBuilder = true }.actionButton(prominent: true)
                 Button("Reset to Default") {
                     settings.vocabularyText = Vocabulary.defaultText
                     settings.dictionaryPacks = []
                 }.actionButton()
             }
-        }
-        .sheet(isPresented: $showBuilder) { DictionaryBuilderSheet(onDone: { showBuilder = false }) }
-    }
-}
-
-/// The "who are you / what do you do" question. The answer is used once for the suggestion request and discarded.
-struct DictionaryBuilderSheet: View {
-    var onDone: () -> Void
-    @ObservedObject private var settings = AppSettings.shared
-    @State private var answer = ""
-    @State private var suggestions: [String] = []
-    @State private var selected: Set<String> = []
-    @State private var busy = false
-    @State private var error: String?
-
-    private var provider: CloudProviderID? {
-        let configured = CloudProviderID.allCases.filter { $0.supportsTextGeneration && $0.apiKey != nil }
-        return configured.first { $0 == settings.cloudProvider } ?? configured.first
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Build your dictionary").font(.title2.bold())
-            Text("Tell us who you are and what you do (your job, company, tools, the people and products you talk about). This is used once to suggest words for your dictionary and is not saved anywhere.")
-                .foregroundStyle(.secondary)
-            if let provider {
-                Text("Sent to \(provider.title) with your key.").font(.caption).foregroundStyle(.secondary)
-            } else {
-                Label { Text("Add an OpenAI or Gemini key in Transcription to get suggestions. You can still edit the list by hand.") } icon: { Icon("info", size: 14) }
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            TextEditor(text: $answer)
-                .frame(height: 90)
-                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
-            if !suggestions.isEmpty {
-                ScrollView {
-                    FlowLayout(spacing: 6) {
-                        ForEach(suggestions, id: \.self) { term in
-                            Toggle(term, isOn: Binding(get: { selected.contains(term) },
-                                                       set: { if $0 { selected.insert(term) } else { selected.remove(term) } }))
-                                .toggleStyle(.button).controlSize(.small)
-                        }
-                    }
-                }
-                .frame(maxHeight: 180)
-            }
-            if let error { Text(error).foregroundStyle(.red).font(.caption) }
-            HStack {
-                Button("Cancel") { onDone() }.actionButton()
-                Spacer()
-                if suggestions.isEmpty {
-                    Button(busy ? "Thinking…" : "Suggest Terms") { suggest() }
-                        .disabled(busy || answer.trimmingCharacters(in: .whitespaces).count < 8 || provider == nil)
-                        .actionButton(prominent: true)
-                        .keyboardShortcut(.defaultAction)
-                } else {
-                    Button("Add \(selected.count) Terms") {
-                        settings.vocabularyText = DictionaryBuilder.merge(suggestions.filter { selected.contains($0) }, into: settings.vocabularyText)
-                        onDone()
-                    }
-                    .disabled(selected.isEmpty)
-                    .actionButton(prominent: true)
-                    .keyboardShortcut(.defaultAction)
-                }
-            }
-        }
-        .padding(20)
-        .frame(width: 480)
-    }
-
-    private func suggest() {
-        guard let provider else { return }
-        busy = true
-        error = nil
-        let text = answer
-        Task {
-            do {
-                let terms = try await DictionaryBuilder.suggestTerms(about: text, provider: provider)
-                suggestions = terms
-                selected = Set(terms)
-                answer = ""
-            } catch {
-                self.error = error.localizedDescription
-            }
-            busy = false
         }
     }
 }
