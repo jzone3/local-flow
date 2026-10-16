@@ -160,7 +160,7 @@ struct SpeedTestCard: View {
                           text: $dictated)
                     .textFieldStyle(.roundedBorder)
                     .focused($focus, equals: .speaking)
-                    .disabled(!typingDone || speakingWPM != nil)
+                    .disabled(!typingDone)
             }
             .onChange(of: stats.records.count) { _, count in dictationArrived(count: count) }
             .onChange(of: focus) { _, field in
@@ -213,7 +213,6 @@ struct SpeedTestCard: View {
     private func dictationArrived(count: Int) {
         guard typingDone, speakingWPM == nil, let baseline = dictationBaseline, count > baseline, let latest = stats.latest else { return }
         speakingWPM = latest.wordsPerMinute
-        focus = nil
     }
 
     private func reset() {
