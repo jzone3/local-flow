@@ -50,23 +50,33 @@ final class WindowManager {
     static let shared = WindowManager()
     private var windows: [String: NSWindow] = [:]
 
-    func showSettings() { show("settings", title: "Local Flow Settings", size: NSSize(width: 620, height: 520)) { SettingsView() } }
+    func showSettings() { show("settings", title: "Local Flow Settings", size: NSSize(width: 640, height: 560)) { SettingsView() } }
     func showHistory() { show("history", title: "History", size: NSSize(width: 560, height: 480)) { HistoryView() } }
-    func showOnboarding() { show("onboarding", title: "Welcome to Local Flow", size: NSSize(width: 560, height: 560)) { OnboardingView() } }
+    func showOnboarding() {
+        show("onboarding", title: "Welcome to Local Flow", size: OnboardingView.windowSize, fixed: true) { OnboardingView() }
+    }
 
     func close(_ key: String) { windows[key]?.close() }
 
-    private func show<V: View>(_ key: String, title: String, size: NSSize, @ViewBuilder content: () -> V) {
+    /// `fixed` windows (setup) have one size and no visible title bar, so the content sits under the traffic lights.
+    private func show<V: View>(_ key: String, title: String, size: NSSize, fixed: Bool = false, @ViewBuilder content: () -> V) {
         NSApp.activate(ignoringOtherApps: true)
         if let window = windows[key] {
             window.makeKeyAndOrderFront(nil)
             return
         }
-        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        var style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable]
+        if fixed { style.insert(.fullSizeContentView) } else { style.insert(.resizable) }
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: style, backing: .buffered, defer: false)
         window.title = title
+        window.titlebarAppearsTransparent = true
+        if fixed {
+            window.titleVisibility = .hidden
+            window.isMovableByWindowBackground = true
+        }
         window.isReleasedWhenClosed = false
-        window.contentViewController = NSHostingController(rootView: content().frame(minWidth: size.width, minHeight: size.height))
+        let root = fixed ? AnyView(content()) : AnyView(content().frame(minWidth: size.width, minHeight: size.height))
+        window.contentViewController = NSHostingController(rootView: root)
         window.center()
         window.makeKeyAndOrderFront(nil)
         windows[key] = window

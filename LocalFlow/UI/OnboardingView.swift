@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// First-run setup: permissions → how to transcribe → dictionary → done.
+/// First-run setup: welcome → permissions → how to transcribe → dictionary → done.
 struct OnboardingView: View {
+    static let windowSize = NSSize(width: 540, height: 600)
+
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var controller = DictationController.shared
     @ObservedObject private var downloader = ModelDownloader.shared
@@ -9,15 +11,10 @@ struct OnboardingView: View {
     @State private var foundKeys: [EnvironmentKeys.Found] = []
     @State private var showBuilder = false
 
-    private let steps = ["Welcome", "Permissions", "Transcription", "Dictionary", "Done"]
+    private let stepCount = 5
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 6) {
-                ForEach(steps.indices, id: \.self) { i in
-                    Capsule().fill(i <= step ? Color.primary : Color.secondary.opacity(0.25)).frame(height: 3)
-                }
-            }
+        VStack(spacing: 0) {
             Group {
                 switch step {
                 case 0: welcome
@@ -27,84 +24,163 @@ struct OnboardingView: View {
                 default: done
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .transition(.opacity)
+            .id(step)
+            footer
+        }
+        .padding(.horizontal, 36)
+        .padding(.top, 40)
+        .padding(.bottom, 24)
+        .frame(width: Self.windowSize.width, height: Self.windowSize.height)
+        .background(WindowBackground().ignoresSafeArea())
+        .animation(.easeInOut(duration: 0.2), value: step)
+        .onAppear { foundKeys = EnvironmentKeys.scan() }
+        .sheet(isPresented: $showBuilder) { DictionaryBuilderSheet(onDone: { showBuilder = false }) }
+    }
+
+    // MARK: Footer
+
+    private var footer: some View {
+        ZStack {
+            HStack(spacing: 7) {
+                ForEach(0..<stepCount, id: \.self) { i in
+                    Capsule()
+                        .fill(i == step ? Color.primary : Color.primary.opacity(0.18))
+                        .frame(width: i == step ? 22 : 7, height: 7)
+                }
+            }
+            .animation(.spring(duration: 0.3), value: step)
             HStack {
-                if step > 0 { Button("Back") { step -= 1 } }
+                if step > 0 {
+                    Button("Back") { step -= 1 }.glassButton()
+                }
                 Spacer()
-                if step < steps.count - 1 {
-                    Button("Continue") { step += 1 }.keyboardShortcut(.defaultAction)
+                if step < stepCount - 1 {
+                    Button("Continue") { step += 1 }
+                        .glassButton(prominent: true)
+                        .keyboardShortcut(.defaultAction)
                 } else {
                     Button("Start Dictating") {
                         settings.onboardingDone = true
                         LocalWhisper.shared.preload()
                         WindowManager.shared.close("onboarding")
                     }
+                    .glassButton(prominent: true)
                     .keyboardShortcut(.defaultAction)
                 }
             }
         }
-        .padding(28)
-        .onAppear { foundKeys = EnvironmentKeys.scan() }
-        .sheet(isPresented: $showBuilder) { DictionaryBuilderSheet(onDone: { showBuilder = false }) }
+        .controlSize(.large)
+        .padding(.top, 20)
     }
 
-    private func header(_ title: String, _ subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.title.bold())
-            Text(subtitle).foregroundStyle(.secondary)
+    // MARK: Pieces
+
+    private func header(_ title: String, _ subtitle: String, icon: String? = nil) -> some View {
+        VStack(spacing: 8) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 36, weight: .light))
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 8)
+            }
+            Text(title).font(.system(size: 26, weight: .bold))
+            Text(subtitle)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
         }
     }
 
-    private var welcome: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            header("Local Flow", "Hold a key, talk, let go. Your words appear wherever your cursor is.")
-            VStack(alignment: .leading, spacing: 10) {
-                Label("Runs Whisper on your Mac. Nothing leaves it unless you choose a cloud model.", systemImage: "lock.shield")
-                Label("Transcripts and recordings are deleted after 12 hours.", systemImage: "clock.arrow.circlepath")
-                Label("Open source. Add your own models and providers.", systemImage: "chevron.left.forwardslash.chevron.right")
+    private func row(_ icon: String, _ title: String, _ detail: String, @ViewBuilder trailing: () -> some View = { EmptyView() }) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundStyle(.secondary)
+                .frame(width: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).fontWeight(.medium)
+                Text(detail).font(.callout).foregroundStyle(.secondary)
             }
+            Spacer(minLength: 12)
+            trailing()
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 13)
+    }
+
+    private var rowDivider: some View { Divider().padding(.leading, 58) }
+
+    // MARK: Steps
+
+    private var welcome: some View {
+        VStack(spacing: 26) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 104, height: 104)
+                .shadow(color: .black.opacity(0.2), radius: 14, y: 8)
+            header("Local Flow", "Hold a key, talk, let go.\nYour words appear wherever your cursor is.")
+            VStack(spacing: 0) {
+                row("lock.shield", "Private by default", "Whisper runs on your Mac. Nothing leaves it unless you pick a cloud model.")
+                rowDivider
+                row("clock.arrow.circlepath", "Nothing kept for long", "Transcripts and recordings are deleted after 12 hours.")
+                rowDivider
+                row("chevron.left.forwardslash.chevron.right", "Open source", "Add your own models and providers.")
+            }
+            .glassCard()
         }
     }
 
     private var permissions: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            header("Two permissions", "macOS asks for these so Local Flow can hear you and type for you.")
-            permissionRow("Microphone", granted: AudioRecorder.hasPermission, detail: "To record while you hold the key.") {
-                Task { _ = await AudioRecorder.requestPermission(); controller.refreshPermissions() }
+        VStack(spacing: 26) {
+            header("Two permissions", "macOS asks for these so Local Flow can hear you and type for you.", icon: "hand.raised")
+            VStack(spacing: 0) {
+                permissionRow("mic", "Microphone", granted: AudioRecorder.hasPermission, detail: "To record while you hold the key.") {
+                    Task { _ = await AudioRecorder.requestPermission(); controller.refreshPermissions() }
+                }
+                rowDivider
+                permissionRow("accessibility", "Accessibility", granted: HotkeyMonitor.hasAccessibility, detail: "To notice the hotkey in any app and paste the text.") {
+                    HotkeyMonitor.requestAccessibility()
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                }
             }
-            permissionRow("Accessibility", granted: HotkeyMonitor.hasAccessibility, detail: "To notice the hotkey in any app and paste the text.") {
-                HotkeyMonitor.requestAccessibility()
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
-            }
-            Button("Re-check") { controller.refreshPermissions() }.controlSize(.small)
+            .glassCard()
+            .id(controller.permissionProblem)
+            Button("Re-check") { controller.refreshPermissions() }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .font(.callout)
         }
     }
 
-    private func permissionRow(_ name: String, granted: Bool, detail: String, action: @escaping () -> Void) -> some View {
-        HStack {
-            Image(systemName: granted ? "checkmark.circle.fill" : "circle").foregroundStyle(granted ? .green : .secondary)
-            VStack(alignment: .leading) {
-                Text(name).fontWeight(.medium)
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+    private func permissionRow(_ icon: String, _ name: String, granted: Bool, detail: String, action: @escaping () -> Void) -> some View {
+        row(icon, name, detail) {
+            if granted {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.title3)
+            } else {
+                Button("Allow", action: action).glassButton()
             }
-            Spacer()
-            if !granted { Button("Allow", action: action) }
         }
-        .id(controller.permissionProblem)
     }
 
     private var transcription: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header("How should it transcribe?", "You can change this any time in Settings.")
+        VStack(spacing: 18) {
+            header("How should it transcribe?", "You can change this any time in Settings.", icon: "waveform")
             Picker("", selection: $settings.engineMode) {
                 ForEach(EngineMode.allCases) { Text($0.title).tag($0) }
             }
-            .pickerStyle(.segmented).labelsHidden()
-            if settings.engineMode == .local {
-                Text("Download a Whisper model. It runs on your GPU and audio never leaves this Mac.").font(.callout)
-                ScrollView { Form { ModelList() }.formStyle(.grouped) }
-            } else {
-                Form {
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 300)
+            Text(settings.engineMode == .local
+                 ? "Download a Whisper model. It runs on your GPU and audio never leaves this Mac."
+                 : "Audio goes to the provider you pick, with your own key.")
+                .font(.callout).foregroundStyle(.secondary)
+            Form {
+                if settings.engineMode == .local {
+                    ModelList()
+                } else {
                     CloudSettings()
                     if !foundKeys.isEmpty {
                         Section("Keys found on this Mac") {
@@ -117,39 +193,50 @@ struct OnboardingView: View {
                                         Keychain.set(item.value, for: provider.keychainAccount)
                                         settings.cloudProviderID = provider.rawValue
                                     }
+                                    .glassButton()
                                     .controlSize(.small)
                                 }
                             }
                         }
                     }
                 }
-                .formStyle(.grouped)
             }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .padding(.horizontal, -20)
         }
     }
 
     private var dictionary: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            header("Your dictionary", "Names, products and jargon spelled your way. You start with a default list.")
-            Text("Answer one question about who you are and what you do, and Local Flow suggests words to add. Your answer is only used for that request and is not saved.")
-                .foregroundStyle(.secondary)
-            Button("Answer the Question…") { showBuilder = true }
-            Text("\(settings.vocabulary.terms.count) terms in your dictionary. Edit them any time in Settings → Dictionary.")
-                .font(.caption).foregroundStyle(.secondary)
+        VStack(spacing: 26) {
+            header("Your dictionary", "Names, products and jargon spelled your way.\nYou start with a default list.", icon: "character.book.closed")
+            VStack(spacing: 0) {
+                row("sparkles", "Build it from one question", "Tell Local Flow who you are and what you do; it suggests words to add. The answer is only used for that request and is never saved.") {
+                    Button("Answer…") { showBuilder = true }.glassButton(prominent: true)
+                }
+                rowDivider
+                row("pencil", "Or edit it later", "\(settings.vocabulary.terms.count) terms so far. Settings → Dictionary.")
+            }
+            .glassCard()
         }
     }
 
     private var done: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            header("You're set", "Hold \(settings.hotkey.displayName) anywhere and start talking.")
-            VStack(alignment: .leading, spacing: 8) {
-                Label("Let go to paste. Press Esc while holding to cancel.", systemImage: "keyboard")
-                Label("Say \"new paragraph\" or \"new line\" for breaks.", systemImage: "text.alignleft")
-                Label("Cleanup (ums, caps, punctuation) is on and happens on this Mac. Turn it off in Settings → Privacy.", systemImage: "sparkles")
-                Label("The menu bar icon has Settings, History and updates.", systemImage: "menubar.rectangle")
+        VStack(spacing: 26) {
+            header("You're set", "Hold \(settings.hotkey.displayName) anywhere and start talking.", icon: "checkmark.circle")
+            VStack(spacing: 0) {
+                row("keyboard", "Let go to paste", "Press Esc while holding to cancel.")
+                rowDivider
+                row("text.alignleft", "Breaks", "Say \"new paragraph\" or \"new line\".")
+                rowDivider
+                row("sparkles", "Cleanup is on", "Ums, caps and punctuation are fixed on this Mac. Turn it off in Settings → Privacy.")
+                rowDivider
+                row("menubar.rectangle", "Menu bar", "Settings, History and updates live there.")
             }
+            .glassCard()
             if controller.permissionProblem != nil {
-                Label("A permission is still missing; the key won't work until it's granted.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Label("A permission is still missing; the key won't work until it's granted.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout).foregroundStyle(.orange)
             }
         }
     }
