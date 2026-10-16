@@ -213,38 +213,138 @@ struct OnboardingView: View {
     }
 
     @State private var fnConflict = Hotkey.systemDictationUsesFnTwice
+    @State private var tryText = ""
+    @State private var sawHotkey = false
 
     private var done: some View {
-        VStack(spacing: 26) {
-            header("You're set", "Hold \(settings.hotkey.displayName) anywhere and talk.\nDouble-tap it to keep listening hands-free; tap again to stop.", icon: "check-circle")
-            VStack(spacing: 0) {
-                row("keyboard", "Let go to paste", "Press Esc while holding to cancel.")
-                rowDivider
-                row("text-lines", "Breaks", "Say \"new paragraph\" or \"new line\".")
-                rowDivider
-                row("sparkles", "Cleanup is on", "Ums, caps and punctuation are fixed on this Mac. Turn it off in Settings → Privacy.")
-                rowDivider
-                row("menubar", "Menu bar", "Settings, History and updates live there.")
-                if settings.hotkey.isFn, fnConflict {
-                    rowDivider
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        row("warning", "Turn off macOS Dictation's Fn shortcut", "It also listens for a double-tap of Fn. System Settings → Keyboard → Dictation shortcut → Off.")
-                        Button("Open") {
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+        VStack(spacing: 18) {
+            header("You're set", "Hold \(settings.hotkey.displayName) anywhere and talk. Let go to paste.\nDouble-tap it to keep listening hands-free; Esc cancels.", icon: "check-circle")
+            KeyboardDemo(hotkey: settings.hotkey, held: controller.state == .listening)
+            VStack(spacing: 8) {
+                TextField("Hold \(settings.hotkey.displayName), say “I talk faster than I type.”, let go", text: $tryText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(2...3)
+                    .controlSize(.large)
+                    .onChange(of: controller.state) { _, state in if state == .listening { sawHotkey = true } }
+                HStack(spacing: 6) {
+                    switch controller.state {
+                    case .listening:
+                        Circle().fill(.red).frame(width: 7, height: 7)
+                        Text("Listening…")
+                    case .transcribing:
+                        ProgressView().controlSize(.mini)
+                        Text("Transcribing…")
+                    default:
+                        if sawHotkey {
+                            Icon("check-circle", size: 13).foregroundStyle(.green)
+                            Text(tryText.isEmpty ? "\(settings.hotkey.displayName) works. Try it again in any app." : "That's it. Works the same in any app.")
+                        } else {
+                            Text("Click the box, then press and hold \(settings.hotkey.displayName) to check it's working.")
                         }
-                        .actionButton().controlSize(.small)
-                        .padding(.trailing, 14)
                     }
                 }
+                .font(.callout).foregroundStyle(.secondary)
+                .frame(height: 18)
             }
-            .card()
-            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                fnConflict = Hotkey.systemDictationUsesFnTwice
+            if settings.hotkey.isFn, fnConflict {
+                HStack(spacing: 8) {
+                    Icon("warning", size: 13).foregroundStyle(.orange)
+                    Text("macOS also uses a double-tap of Fn for its own Dictation. For hands-free, set System Settings → Keyboard → Dictation shortcut to Off.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Open") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                    }
+                    .actionButton().controlSize(.small)
+                }
+                .padding(12)
+                .card(cornerRadius: 10)
             }
             if controller.permissionProblem != nil {
                 Label { Text("A permission is still missing; the key won't work until it's granted.") } icon: { Icon("warning", size: 14) }
                     .font(.callout).foregroundStyle(.orange)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            fnConflict = Hotkey.systemDictationUsesFnTwice
+        }
+    }
+}
+
+/// A flat drawing of a Mac keyboard. The hotkey's key is labelled and presses itself on a loop until the user
+/// really holds it, then it stays down for as long as they do.
+struct KeyboardDemo: View {
+    let hotkey: Hotkey
+    let held: Bool
+    @State private var demoDown = false
+    @State private var ticker: Timer?
+
+    private let key: CGFloat = 22
+    private let gap: CGFloat = 4
+    private let rows: [[CGFloat]] = [  // key widths in units; the bottom row holds fn/ctrl/opt/cmd/space/cmd/opt
+        Array(repeating: 1, count: 13) + [1.6],
+        [1.6] + Array(repeating: 1, count: 13),
+        [1.9] + Array(repeating: 1, count: 11) + [1.7],
+        [2.4] + Array(repeating: 1, count: 10) + [2.2],
+        [1, 1, 1, 1.3, 5.6, 1.3, 1, 1, 1],
+    ]
+
+    private var down: Bool { held || demoDown }
+
+    /// (row, column) of the key that stands for the hotkey.
+    private var target: (Int, Int) {
+        switch hotkey.keyCode {
+        case Hotkey.fn.keyCode: return (4, 0)
+        case Hotkey.rightOption.keyCode: return (4, 6)
+        case Hotkey.rightCommand.keyCode: return (4, 5)
+        case 58: return (4, 2)   // left option
+        case 55: return (4, 3)   // left command
+        default: return (2, 6)   // some letter key: show it on the home row
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: gap) {
+            ForEach(rows.indices, id: \.self) { r in
+                HStack(spacing: gap) {
+                    ForEach(rows[r].indices, id: \.self) { c in
+                        let isTarget = (r, c) == target
+                        keycap(width: rows[r][c] * key + (rows[r][c] - 1) * gap, label: isTarget ? hotkey.displayName : nil, pressed: isTarget && down)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.6), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.separator))
+        .animation(.easeInOut(duration: 0.12), value: down)
+        .onAppear {
+            ticker = Timer.scheduledTimer(withTimeInterval: 0.9, repeats: true) { _ in
+                demoDown.toggle()
+            }
+        }
+        .onDisappear { ticker?.invalidate() }
+        .onChange(of: held) { _, isHeld in
+            if isHeld { ticker?.invalidate(); ticker = nil; demoDown = false }
+        }
+        .accessibilityLabel("Keyboard with the \(hotkey.displayName) key highlighted")
+    }
+
+    private func keycap(width: CGFloat, label: String?, pressed: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
+        return ZStack {
+            shape.fill(label == nil ? Color.primary.opacity(0.07) : (pressed ? Color.accentColor : Color.primary.opacity(0.85)))
+            if let label {
+                Text(label)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Color(nsColor: .windowBackgroundColor))
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .padding(.horizontal, 2)
+            }
+        }
+        .frame(width: width, height: key)
+        .shadow(color: .black.opacity(label == nil ? 0 : (pressed ? 0.05 : 0.25)), radius: pressed ? 1 : 4, y: pressed ? 0 : 3)
+        .offset(y: pressed ? 2 : 0)
+        .scaleEffect(pressed ? 0.96 : 1)
     }
 }
