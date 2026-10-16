@@ -22,6 +22,7 @@ struct Hotkey: Codable, Equatable {
     ]
 
     var isModifierOnly: Bool { Hotkey.modifierKeyCodes[keyCode] != nil }
+    var isFn: Bool { keyCode == Hotkey.fn.keyCode }
 
     var displayName: String {
         if let name = Hotkey.modifierKeyCodes[keyCode] { return name }

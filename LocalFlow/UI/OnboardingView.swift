@@ -223,6 +223,17 @@ struct OnboardingView: View {
                 row("sparkles", "Cleanup is on", "Ums, caps and punctuation are fixed on this Mac. Turn it off in Settings → Privacy.")
                 rowDivider
                 row("menubar", "Menu bar", "Settings, History and updates live there.")
+                if settings.hotkey.isFn {
+                    rowDivider
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        row("warning", "Turn off macOS Dictation's Fn shortcut", "It also listens for a double-tap of Fn. System Settings → Keyboard → Dictation shortcut → Off.")
+                        Button("Open") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                        }
+                        .actionButton().controlSize(.small)
+                        .padding(.trailing, 14)
+                    }
+                }
             }
             .card()
             if controller.permissionProblem != nil {

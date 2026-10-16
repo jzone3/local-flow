@@ -23,6 +23,18 @@ struct GeneralSettings: View {
                 HotkeyRecorder(hotkey: $settings.hotkey)
                 Text("Hold it to talk, let go to paste. Double-tap to keep listening hands-free; tap again to stop. Esc cancels.")
                     .font(.caption).foregroundStyle(.secondary)
+                if settings.hotkey.isFn {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Icon("warning", size: 13).foregroundStyle(.orange)
+                        Text("macOS also uses a double-tap of Fn for its own Dictation. For hands-free to work, set System Settings → Keyboard → Dictation shortcut to Off.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Open Keyboard Settings") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                        }
+                        .actionButton().controlSize(.small)
+                    }
+                }
             }
             Section("Feedback") {
                 Toggle("Play a sound when recording starts and stops", isOn: $settings.playSounds)

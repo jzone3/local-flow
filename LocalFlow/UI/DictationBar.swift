@@ -69,7 +69,7 @@ struct DictationBarView: View {
         content
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
-            .frame(minWidth: 220, maxWidth: 420)
+            .frame(minWidth: 220, maxWidth: 560)
             .modifier(GlassBackground())
             .padding(14)
             .animation(.spring(duration: 0.3), value: controller.state)
