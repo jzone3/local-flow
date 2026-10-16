@@ -41,6 +41,9 @@ struct GeneralSettings: View {
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 fnConflict = Hotkey.systemDictationUsesFnTwice
             }
+            Section("Microphone") {
+                MicrophonePicker()
+            }
             Section("Feedback") {
                 Toggle("Play a sound when recording starts and stops", isOn: $settings.playSounds)
             }
@@ -181,6 +184,52 @@ struct EnvironmentKeyPicker: View {
         guard provider.apiKey == nil else { return [] }
         let names = provider.environmentVariables
         return EnvironmentKeys.scan().filter { names.contains($0.name) }
+    }
+}
+
+/// Pick which microphone to record from; live level meter shows it is the right one.
+struct MicrophonePicker: View {
+    @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var recorder = DictationController.shared.recorder
+    @State private var devices = AudioInputDevice.all
+    @State private var systemDefault = AudioInputDevice.systemDefault
+
+    var body: some View {
+        Picker("Microphone", selection: Binding(
+            get: { settings.inputDeviceUID ?? "" },
+            set: { settings.inputDeviceUID = $0.isEmpty ? nil : $0 }
+        )) {
+            Text("System default" + (systemDefault.map { " (\($0.name))" } ?? "")).tag("")
+            ForEach(devices) { device in Text(device.name).tag(device.uid) }
+        }
+        HStack(spacing: 10) {
+            Icon("mic", size: 14).foregroundStyle(.secondary)
+            LevelMeter(level: recorder.monitorLevel)
+            Text(recorder.isRecording ? "Recording" : "Say something to test").font(.caption).foregroundStyle(.secondary)
+        }
+        .onAppear { recorder.startMonitoring(); refresh() }
+        .onDisappear { recorder.stopMonitoring() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
+    }
+
+    private func refresh() {
+        devices = AudioInputDevice.all
+        systemDefault = AudioInputDevice.systemDefault
+        if let uid = settings.inputDeviceUID, !devices.contains(where: { $0.uid == uid }) { settings.inputDeviceUID = nil }
+    }
+}
+
+struct LevelMeter: View {
+    let level: Float
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color(nsColor: .separatorColor))
+                Capsule().fill(Color.green).frame(width: geo.size.width * CGFloat(min(1, max(0, level))))
+            }
+        }
+        .frame(width: 160, height: 6)
+        .animation(.linear(duration: 0.08), value: level)
     }
 }
 

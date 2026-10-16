@@ -12,7 +12,7 @@ final class DictationController: ObservableObject {
         case idle
         case listening
         case transcribing
-        case done(String)
+        case done
         case failed(String)
 
         var isActive: Bool { self == .listening || self == .transcribing }
@@ -141,8 +141,13 @@ final class DictationController: ObservableObject {
                                                      engine: outcome.engine, durationSeconds: duration, audioFileName: audioURL.lastPathComponent))
                 TextInserter.insert(outcome.text)
                 if settings.playSounds { NSSound(named: "Pop")?.play() }
-                state = .done(outcome.text)
-                scheduleHide(after: outcome.warning == nil ? 1.2 : 3)
+                if outcome.warning == nil {
+                    state = .idle
+                    bar.hide()
+                } else {
+                    state = .done
+                    scheduleHide(after: 3)
+                }
             } catch {
                 guard !Task.isCancelled else { return }
                 try? FileManager.default.removeItem(at: audioURL)

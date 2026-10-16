@@ -72,6 +72,8 @@ final class AppSettings: ObservableObject {
     @Published var language: String { didSet { defaults.set(language, forKey: "language") } }
     @Published var hotkey: Hotkey { didSet { defaults.set(try? JSONEncoder().encode(hotkey), forKey: "hotkey") } }
     @Published var playSounds: Bool { didSet { defaults.set(playSounds, forKey: "playSounds") } }
+    /// CoreAudio device UID of the microphone to record from; nil = system default.
+    @Published var inputDeviceUID: String? { didSet { defaults.set(inputDeviceUID, forKey: "inputDeviceUID") } }
     @Published var onboardingDone: Bool { didSet { defaults.set(onboardingDone, forKey: "onboardingDone") } }
 
     static let historyRetention: TimeInterval = 12 * 60 * 60
@@ -88,6 +90,7 @@ final class AppSettings: ObservableObject {
         language = defaults.string(forKey: "language") ?? "auto"
         hotkey = defaults.data(forKey: "hotkey").flatMap { try? JSONDecoder().decode(Hotkey.self, from: $0) } ?? .fn
         playSounds = defaults.object(forKey: "playSounds") as? Bool ?? true
+        inputDeviceUID = defaults.string(forKey: "inputDeviceUID")
         onboardingDone = defaults.bool(forKey: "onboardingDone")
     }
 

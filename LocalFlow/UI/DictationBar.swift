@@ -84,25 +84,23 @@ struct DictationBarView: View {
                     .overlay(Circle().stroke(.red.opacity(0.4), lineWidth: 6).scaleEffect(1 + CGFloat(recorder.level)))
                 Waveform(levels: recorder.levels)
                     .frame(width: 150, height: 28)
-                Text(controller.handsFree ? "Listening · tap \(AppSettings.shared.hotkey.displayName) to stop" : "Listening")
-                    .font(.system(size: 13, weight: .medium)).foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(controller.handsFree ? "Listening · tap \(AppSettings.shared.hotkey.displayName) to stop" : "Listening")
+                        .font(.system(size: 13, weight: .medium)).foregroundStyle(.primary)
+                    Label { Text(AudioInputDevice.current.name) } icon: { Icon("mic", size: 10) }
+                        .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
         case .transcribing:
             HStack(spacing: 12) {
                 ProgressView().controlSize(.small)
                 Text("Transcribing…").font(.system(size: 13, weight: .medium))
             }
-        case .done(let text):
+        case .done:
             HStack(spacing: 10) {
-                Icon("check-circle", size: 16).foregroundStyle(.green)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(text).font(.system(size: 13)).lineLimit(2).truncationMode(.tail)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let warning = controller.lastWarning {
-                        Label { Text(warning) } icon: { Icon("warning", size: 11) }
-                            .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
-                    }
-                }
+                Icon("warning", size: 16).foregroundStyle(.orange)
+                Text(controller.lastWarning ?? "Pasted").font(.system(size: 13)).lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         case .failed(let message):
             HStack(spacing: 10) {

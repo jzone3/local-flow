@@ -1,4 +1,6 @@
 import AVFoundation
+import AudioToolbox
+import CoreAudio
 import Combine
 import Foundation
 
@@ -9,6 +11,10 @@ final class AudioRecorder: ObservableObject {
 
     @Published private(set) var level: Float = 0
     @Published private(set) var levels: [Float] = Array(repeating: 0, count: 24)
+    /// Level while the Settings mic test is open; audio is not kept.
+    @Published private(set) var monitorLevel: Float = 0
+    private var monitoring = false
+    private var monitorCancellable: AnyCancellable?
 
     private let engine = AVAudioEngine()
     private var converter: AVAudioConverter?
@@ -29,8 +35,10 @@ final class AudioRecorder: ObservableObject {
 
     func start() throws {
         guard !isRecording else { return }
+        stopMonitoring()
         samples = []
         let input = engine.inputNode
+        selectDevice(on: input)
         let inputFormat = input.inputFormat(forBus: 0)
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
             throw NSError(domain: "LocalFlow.Audio", code: 1, userInfo: [NSLocalizedDescriptionKey: "No microphone is available."])
@@ -45,6 +53,49 @@ final class AudioRecorder: ObservableObject {
         try engine.start()
         isRecording = true
         startedAt = Date()
+    }
+
+    /// Settings mic test: runs the engine with a tap that only measures level. Stops itself when a real
+    /// recording starts and restarts when the chosen device changes.
+    func startMonitoring() {
+        guard !monitoring, !isRecording, Self.hasPermission else { return }
+        monitoring = true
+        let input = engine.inputNode
+        selectDevice(on: input)
+        let format = input.inputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else { monitoring = false; return }
+        input.removeTap(onBus: 0)
+        input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
+            guard let self, let data = buffer.floatChannelData, buffer.frameLength > 0 else { return }
+            let chunk = UnsafeBufferPointer(start: data[0], count: Int(buffer.frameLength))
+            let rms = sqrt(chunk.reduce(0) { $0 + $1 * $1 } / Float(chunk.count))
+            let normalized = min(1, max(0, (20 * log10(max(rms, 1e-6)) + 50) / 50))
+            DispatchQueue.main.async { self.monitorLevel = self.monitorLevel * 0.5 + normalized * 0.5 }
+        }
+        engine.prepare()
+        try? engine.start()
+        monitorCancellable = AppSettings.shared.$inputDeviceUID.dropFirst().removeDuplicates().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.stopMonitoring(); self?.startMonitoring() }
+        }
+    }
+
+    func stopMonitoring() {
+        guard monitoring else { return }
+        monitoring = false
+        monitorCancellable = nil
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        monitorLevel = 0
+    }
+
+    /// Points the input node at the microphone chosen in Settings (system default when none is chosen).
+    private func selectDevice(on input: AVAudioInputNode) {
+        guard let uid = AppSettings.shared.inputDeviceUID,
+              let device = AudioInputDevice.all.first(where: { $0.uid == uid }),
+              let unit = input.audioUnit else { return }
+        var id = device.id
+        AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                             &id, UInt32(MemoryLayout<AudioDeviceID>.size))
     }
 
     /// Stops and returns the captured samples plus their duration in seconds.
