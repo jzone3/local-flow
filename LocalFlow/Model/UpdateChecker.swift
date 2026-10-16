@@ -163,7 +163,7 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         return false
         #else
         let parent = bundleURL.deletingLastPathComponent().path
-        let translocated = bundleURL.path.contains("/AppTranslocation/")
+        let translocated = bundleURL.path.hasPrefix("/Volumes/") || bundleURL.path.contains("/AppTranslocation/")
         return !translocated && bundleURL.pathExtension == "app"
             && FileManager.default.isWritableFile(atPath: parent)
         #endif
