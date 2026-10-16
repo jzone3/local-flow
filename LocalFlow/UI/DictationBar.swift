@@ -1,8 +1,11 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// The floating pill at the bottom of the screen. Liquid Glass on macOS 26, frosted material before that.
 final class DictationBarPanel: NSPanel {
+    private var resize: AnyCancellable?
+
     init() {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 360, height: 72),
                    styleMask: [.borderless, .nonactivatingPanel, .hudWindow], backing: .buffered, defer: false)
@@ -20,6 +23,13 @@ final class DictationBarPanel: NSPanel {
 
     func attach(recorder: AudioRecorder, controller: DictationController) {
         contentView = NSHostingView(rootView: DictationBarView(recorder: recorder, controller: controller))
+        // fittingSize lags one run-loop turn behind a SwiftUI state change, so re-fit after each one;
+        // otherwise the pill keeps the size it had when it first appeared and the label gets cut off.
+        resize = controller.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { if self?.isVisible == true { self?.position() } }
+            }
     }
 
     func show() {
