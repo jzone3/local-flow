@@ -51,6 +51,22 @@ expect(vocab.applySpelling(to: "devinsdinner"), "devinsdinner", "no partial word
 expect(vocab.promptHint(limit: 3), "Okay, so here are some names and terms I use a lot: GitHub, ChatGPT and Next.js. Let's get started.", "prompt hint")
 expect(Vocabulary(text: vocab.text) == vocab, "round trip")
 expect(!Vocabulary(text: Vocabulary.defaultText).terms.isEmpty, "default list parses")
+
+// Vocabulary packs
+let base = Vocabulary.defaultText + "\nMyOwnWord"
+let withEng = VocabularyPack.apply(selected: ["engineering"], previouslySelected: [], to: base)
+expect(Vocabulary(text: withEng).terms.contains("Terraform"), "pack adds its terms")
+expect(Vocabulary(text: withEng).terms.filter { $0.lowercased() == "github" }.count == 1, "pack does not duplicate base terms")
+let withBoth = VocabularyPack.apply(selected: ["engineering", "founder"], previouslySelected: ["engineering"], to: withEng)
+expect(Vocabulary(text: withBoth).terms.contains("cap table"), "second pack adds")
+let backToFounder = VocabularyPack.apply(selected: ["founder"], previouslySelected: ["engineering", "founder"], to: withBoth)
+let t = Vocabulary(text: backToFounder).terms
+expect(!t.contains("Terraform"), "deselected pack's terms removed")
+expect(t.contains("cap table") && t.contains("MyOwnWord") && t.contains("GitHub"), "other pack, user and base terms kept")
+expect(t.contains("QuickBooks"), "term shared with a still-selected pack kept")
+let none = VocabularyPack.apply(selected: [], previouslySelected: ["founder"], to: backToFounder)
+expect(Vocabulary(text: none) == Vocabulary(text: base), "removing all packs restores the original list")
+for p in VocabularyPack.all { expect(Set(p.terms.map { $0.lowercased() }).count == p.terms.count, "no duplicates inside pack \(p.id)") }
 expect(vocab.keyterms().contains("Local Flow"), "keyterms")
 
 // EnvironmentKeys

@@ -213,6 +213,8 @@ struct DictionarySettings: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Words and names spelled your way. One per line; `heard => Correct` forces a replacement. The list is sent to the speech model as a hint and used to fix spelling on this Mac.")
                 .font(.caption).foregroundStyle(.secondary)
+            Text("Word packs").font(.subheadline).fontWeight(.medium).padding(.top, 4)
+            PackPicker(columns: 4)
             TextEditor(text: $settings.vocabularyText)
                 .font(.system(.body, design: .monospaced))
                 .frame(minHeight: 240)
@@ -221,7 +223,10 @@ struct DictionarySettings: View {
                 Text("\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Suggest Terms for Me…") { showBuilder = true }.actionButton(prominent: true)
-                Button("Reset to Default") { settings.vocabularyText = Vocabulary.defaultText }.actionButton()
+                Button("Reset to Default") {
+                    settings.vocabularyText = Vocabulary.defaultText
+                    settings.dictionaryPacks = []
+                }.actionButton()
             }
         }
         .sheet(isPresented: $showBuilder) { DictionaryBuilderSheet(onDone: { showBuilder = false }) }

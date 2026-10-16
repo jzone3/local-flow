@@ -56,6 +56,7 @@ final class AppSettings: ObservableObject {
     @Published var fallbackToLocal: Bool { didSet { defaults.set(fallbackToLocal, forKey: "fallbackToLocal") } }
     @Published var cleanupEnabled: Bool { didSet { defaults.set(cleanupEnabled, forKey: "cleanupEnabled") } }
     @Published var vocabularyText: String { didSet { defaults.set(vocabularyText, forKey: "vocabulary") } }
+    @Published var dictionaryPacks: [String] { didSet { defaults.set(dictionaryPacks, forKey: "dictionaryPacks") } }
     @Published var language: String { didSet { defaults.set(language, forKey: "language") } }
     @Published var hotkey: Hotkey { didSet { defaults.set(try? JSONEncoder().encode(hotkey), forKey: "hotkey") } }
     @Published var playSounds: Bool { didSet { defaults.set(playSounds, forKey: "playSounds") } }
@@ -71,6 +72,7 @@ final class AppSettings: ObservableObject {
         fallbackToLocal = defaults.object(forKey: "fallbackToLocal") as? Bool ?? true
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
         vocabularyText = defaults.string(forKey: "vocabulary") ?? Vocabulary.defaultText
+        dictionaryPacks = defaults.stringArray(forKey: "dictionaryPacks") ?? []
         language = defaults.string(forKey: "language") ?? "auto"
         hotkey = defaults.data(forKey: "hotkey").flatMap { try? JSONDecoder().decode(Hotkey.self, from: $0) } ?? .fn
         playSounds = defaults.object(forKey: "playSounds") as? Bool ?? true
@@ -78,6 +80,15 @@ final class AppSettings: ObservableObject {
     }
 
     var vocabulary: Vocabulary { Vocabulary(text: vocabularyText) }
+
+    func setPack(_ id: String, on: Bool) {
+        let before = Set(dictionaryPacks)
+        var after = before
+        if on { after.insert(id) } else { after.remove(id) }
+        guard after != before else { return }
+        vocabularyText = VocabularyPack.apply(selected: after, previouslySelected: before, to: vocabularyText)
+        dictionaryPacks = VocabularyPack.all.map(\.id).filter { after.contains($0) }
+    }
     var cloudProvider: CloudProviderID { CloudProviderID(rawValue: cloudProviderID) ?? .openAI }
 
     func cloudModel(for provider: CloudProviderID) -> String {

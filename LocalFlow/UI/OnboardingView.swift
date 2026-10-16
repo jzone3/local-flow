@@ -208,16 +208,17 @@ struct OnboardingView: View {
     }
 
     private var dictionary: some View {
-        VStack(spacing: 26) {
-            header("Your dictionary", "Names, products and jargon spelled your way.\nYou start with a default list.", icon: "character.book.closed")
+        VStack(spacing: 20) {
+            header("What do you do?", "Pick any that apply. Each adds the names and jargon of that field\nto your dictionary, on top of the default list.", icon: "character.book.closed")
+            PackPicker()
             VStack(spacing: 0) {
-                row("sparkles", "Build it from one question", "Tell Local Flow who you are and what you do; it suggests words to add. The answer is only used for that request and is never saved.") {
-                    Button("Answer…") { showBuilder = true }.actionButton(prominent: true)
+                row("sparkles", "Or describe yourself", "One sentence about who you are and what you do; Local Flow suggests words from it. Needs an OpenAI or Gemini key. The answer is never saved.") {
+                    Button("Answer…") { showBuilder = true }.actionButton()
                 }
-                rowDivider
-                row("pencil", "Or edit it later", "\(settings.vocabulary.terms.count) terms so far. Settings → Dictionary.")
             }
             .card()
+            Text("\(settings.vocabulary.terms.count) terms. Edit any time in Settings → Dictionary.")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
