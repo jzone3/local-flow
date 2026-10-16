@@ -4,6 +4,8 @@
 
 Open-source, privacy-first dictation for the Mac. Hold a key, talk, let go — your words are typed wherever your cursor is.
 
+[uselocalflow.app](https://www.uselocalflow.app)
+
 - **Hold to talk.** Fn by default; pick any key in Settings. Double-tap it to keep listening hands-free, tap again to stop. A small Liquid Glass bar shows a live waveform while you speak; the text goes straight to your cursor. Pick which microphone to use in Settings.
 - **Local by default.** Whisper (whisper.cpp with Metal) runs on your Mac. Three models to pick from — Best (default), Classic, Tiny — downloaded in-app.
 - **Or bring your own key.** OpenAI, ElevenLabs Scribe or Gemini, with retries and automatic fallback to the local model. Setup finds keys already in your shell environment.

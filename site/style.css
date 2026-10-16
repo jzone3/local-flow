@@ -85,6 +85,7 @@ kbd { font: inherit; font-size: 13px; padding: 1px 6px; border: 1px solid var(--
   opacity: 0; transition: opacity .25s ease, transform .25s ease;
 }
 .listening .bar, .transcribing .bar { opacity: 1; transform: translate(-50%, 0); }
+.hiding .bar { opacity: 0; transform: translate(-50%, 8px); }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: #e5484d; box-shadow: 0 0 0 5px rgba(229,72,77,.25); flex: none; transition: background .2s, box-shadow .2s; }
 .transcribing .dot { background: var(--muted); box-shadow: 0 0 0 5px color-mix(in srgb, var(--muted) 25%, transparent); }
 .wave { display: inline-flex; align-items: center; gap: 3px; height: 22px; }
