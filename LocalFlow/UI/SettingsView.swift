@@ -6,6 +6,7 @@ struct SettingsView: View {
             GeneralSettings().tabItem { Label { Text("General") } icon: { Image(nsImage: Icon.nsImage("gear", size: 16)) } }
             TranscriptionSettings().tabItem { Label { Text("Transcription") } icon: { Image(nsImage: Icon.nsImage("waveform", size: 16)) } }
             DictionarySettings().tabItem { Label { Text("Dictionary") } icon: { Image(nsImage: Icon.nsImage("book", size: 16)) } }
+            StatsView().tabItem { Label { Text("Stats") } icon: { Image(nsImage: Icon.nsImage("chart", size: 16)) } }
             PrivacySettings().tabItem { Label { Text("Privacy") } icon: { Image(nsImage: Icon.nsImage("lock", size: 16)) } }
             AboutSettings().tabItem { Label { Text("About") } icon: { Image(nsImage: Icon.nsImage("info", size: 16)) } }
         }

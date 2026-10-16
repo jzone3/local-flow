@@ -139,6 +139,7 @@ final class DictationController: ObservableObject {
                 }
                 HistoryStore.shared.add(HistoryEntry(id: entryID, date: Date(), text: outcome.text, rawText: outcome.rawText,
                                                      engine: outcome.engine, durationSeconds: duration, audioFileName: audioURL.lastPathComponent))
+                StatsStore.shared.record(words: StatsStore.wordCount(outcome.text), seconds: duration)
                 TextInserter.insert(outcome.text)
                 if settings.playSounds { NSSound(named: "Pop")?.play() }
                 if outcome.warning == nil {
