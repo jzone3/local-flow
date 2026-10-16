@@ -221,10 +221,20 @@ struct OnboardingView: View {
             header("You're set", "Hold \(settings.hotkey.displayName) anywhere and talk. Let go to paste.\nDouble-tap it to keep listening hands-free; Esc cancels.", icon: "check-circle")
             KeyboardDemo(hotkey: settings.hotkey, held: controller.state == .listening)
             VStack(spacing: 8) {
-                TextField("Hold \(settings.hotkey.displayName), say “I talk faster than I type.”, let go", text: $tryText, axis: .vertical)
-                    .textFieldStyle(.roundedBorder)
+                TextField("Say “I talk faster than I type.”", text: $tryText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 15))
                     .lineLimit(2...3)
-                    .controlSize(.large)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: 380)
+                    .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(controller.state == .listening ? Color.red.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+                    .animation(.easeInOut(duration: 0.15), value: controller.state == .listening)
                     .onChange(of: controller.state) { _, state in if state == .listening { sawHotkey = true } }
                 HStack(spacing: 6) {
                     switch controller.state {
@@ -270,7 +280,7 @@ struct OnboardingView: View {
     }
 }
 
-/// A flat drawing of a Mac keyboard. The hotkey's key is labelled and presses itself on a loop until the user
+/// A line drawing of a Mac keyboard. The hotkey's key is labelled and presses itself on a loop until the user
 /// really holds it, then it stays down for as long as they do.
 struct KeyboardDemo: View {
     let hotkey: Hotkey
@@ -278,8 +288,8 @@ struct KeyboardDemo: View {
     @State private var demoDown = false
     @State private var ticker: Timer?
 
-    private let key: CGFloat = 22
-    private let gap: CGFloat = 4
+    private let key: CGFloat = 24
+    private let gap: CGFloat = 5
     private let rows: [[CGFloat]] = [  // key widths in units; the bottom row holds fn/ctrl/opt/cmd/space/cmd/opt
         Array(repeating: 1, count: 13) + [1.6],
         [1.6] + Array(repeating: 1, count: 13),
@@ -302,6 +312,8 @@ struct KeyboardDemo: View {
         }
     }
 
+    private let line = Color.primary.opacity(0.28)
+
     var body: some View {
         VStack(spacing: gap) {
             ForEach(rows.indices, id: \.self) { r in
@@ -313,10 +325,9 @@ struct KeyboardDemo: View {
                 }
             }
         }
-        .padding(12)
-        .background(Color(nsColor: .windowBackgroundColor).opacity(0.6), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.separator))
-        .animation(.easeInOut(duration: 0.12), value: down)
+        .padding(14)
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(line, lineWidth: 1))
+        .animation(.easeInOut(duration: 0.14), value: down)
         .onAppear {
             ticker = Timer.scheduledTimer(withTimeInterval: 0.9, repeats: true) { _ in
                 demoDown.toggle()
@@ -329,13 +340,18 @@ struct KeyboardDemo: View {
         .accessibilityLabel("Keyboard with the \(hotkey.displayName) key highlighted")
     }
 
+    /// Plain keys are a single thin outline; the hotkey key is drawn solid and sinks when pressed.
     private func keycap(width: CGFloat, label: String?, pressed: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 4, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: 5, style: .continuous)
         return ZStack {
-            shape.fill(label == nil ? Color.primary.opacity(0.07) : (pressed ? Color.accentColor : Color.primary.opacity(0.85)))
+            if label == nil {
+                shape.strokeBorder(line, lineWidth: 1)
+            } else {
+                shape.fill(pressed ? Color.accentColor : Color.primary)
+            }
             if let label {
                 Text(label)
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(Color(nsColor: .windowBackgroundColor))
                     .minimumScaleFactor(0.6)
                     .lineLimit(1)
@@ -343,8 +359,8 @@ struct KeyboardDemo: View {
             }
         }
         .frame(width: width, height: key)
-        .shadow(color: .black.opacity(label == nil ? 0 : (pressed ? 0.05 : 0.25)), radius: pressed ? 1 : 4, y: pressed ? 0 : 3)
+        .shadow(color: .black.opacity(label == nil || pressed ? 0 : 0.18), radius: 3, y: 2)
         .offset(y: pressed ? 2 : 0)
-        .scaleEffect(pressed ? 0.96 : 1)
+        .scaleEffect(pressed ? 0.95 : 1)
     }
 }

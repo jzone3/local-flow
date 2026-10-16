@@ -73,13 +73,30 @@ private struct WelcomeView: View {
         .padding(.bottom, 28)
         .frame(width: 400)
         .overlay(alignment: .topLeading) {
-            Button("Try Devin") { NSWorkspace.shared.open(Welcome.devinURL) }
-                .buttonStyle(.link)
-                .font(.system(size: 12))
-                .padding(.leading, 12)
-                .padding(.top, 8)
+            TryDevinLink()
+                .padding(.leading, 16)
+                .padding(.top, 14)
         }
         .ignoresSafeArea(.container, edges: .top)
     }
 
+}
+
+/// Quiet "Try Devin ↗" text in the sheet's corner: body-grey, blue only on hover.
+private struct TryDevinLink: View {
+    @State private var hover = false
+
+    var body: some View {
+        Button {
+            NSWorkspace.shared.open(Welcome.devinURL)
+        } label: {
+            Text("Try Devin \u{2197}")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(hover ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .onHover { hover = $0 }
+        .animation(.easeInOut(duration: 0.12), value: hover)
+        .help("Open devin.ai")
+    }
 }
