@@ -1,0 +1,39 @@
+name: LocalFlow
+options:
+  bundleIdPrefix: com.jzone3
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  xcodeVersion: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: NO
+    SWIFT_STRICT_CONCURRENCY: minimal
+targets:
+  LocalFlow:
+    type: application
+    platform: macOS
+    sources:
+      - path: LocalFlow
+    dependencies:
+      # whisper.cpp prebuilt xcframework, fetched by scripts/fetch-whisper.sh (gitignored).
+      - framework: Vendor/whisper.xcframework
+        embed: true
+        codeSign: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jzone3.LocalFlow
+        PRODUCT_NAME: Local Flow
+        INFOPLIST_FILE: LocalFlow/Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_APP_SANDBOX: NO
+        GENERATE_INFOPLIST_FILE: NO
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+        OTHER_LDFLAGS: "$(inherited) -lc++"

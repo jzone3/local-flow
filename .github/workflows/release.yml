@@ -1,0 +1,162 @@
+name: Release
+
+# Every push to master auto-tags the next patch version (v0.1.2, v0.1.3, …), builds, signs (Developer ID),
+# notarizes and publishes the DMG, so /releases/latest always serves master. Pushing a tag like v0.2.0 by hand
+# does the same for an explicit version. Pushing any `release-dry-run/**` branch runs the pipeline but only
+# uploads the DMG as an artifact.
+on:
+  push:
+    branches: ["master", "release-dry-run/**"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+# One release at a time, in order — two master pushes in flight must not both compute the same next tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  APP_NAME: Local Flow
+  SCHEME: LocalFlow
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tags are needed to compute the next version
+
+      - run: brew install xcodegen
+      - run: scripts/fetch-whisper.sh
+      - run: xcodegen generate
+
+      - name: Version
+        id: version
+        run: |
+          SEMVER='^[0-9]+\.[0-9]+\.[0-9]+$'
+          PUBLISH=false
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            # CFBundleShortVersionString must be dotted integers; also keeps the tag from reaching a shell unescaped.
+            if [[ ! "$VERSION" =~ $SEMVER ]]; then
+              echo "Tag v$VERSION is not a valid version (expected vMAJOR.MINOR.PATCH)" >&2
+              exit 1
+            fi
+            PUBLISH=true
+          elif [[ "$GITHUB_REF" == refs/heads/master ]]; then
+            # Next patch after the highest existing vX.Y.Z tag; the tag itself is created at publish time.
+            LATEST="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | { grep -E "$SEMVER" || true; } | sort -V | tail -1)"
+            LATEST="${LATEST:-0.0.0}"
+            IFS=. read -r MAJOR MINOR PATCH <<< "$LATEST"
+            VERSION="$((10#$MAJOR)).$((10#$MINOR)).$((10#$PATCH + 1))"
+            PUBLISH=true
+          else
+            VERSION="0.0.$GITHUB_RUN_NUMBER"
+          fi
+          echo "marketing=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+          echo "Version $VERSION (publish=$PUBLISH)"
+
+      - name: Import Developer ID certificate
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+          echo "$MAC_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MAC_CERT_PASSWORD" -A \
+            -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          rm "$RUNNER_TEMP/cert.p12"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Archive (signed, hardened runtime)
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VERSION: ${{ steps.version.outputs.marketing }}
+        run: |
+          xcodebuild archive \
+            -project LocalFlow.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            ENABLE_HARDENED_RUNTIME=YES \
+            OTHER_CODE_SIGN_FLAGS="--timestamp" \
+            | tail -30
+          cp -R "$RUNNER_TEMP/app.xcarchive/Products/Applications/$APP_NAME.app" .
+          codesign --verify --deep --strict --verbose=2 "$APP_NAME.app"
+
+      - name: Notarize app
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+        run: |
+          echo "$NOTARY_KEY_P8" | base64 --decode > "$NOTARY_KEY_PATH"
+          ditto -c -k --keepParent "$APP_NAME.app" "$RUNNER_TEMP/app.zip"
+          scripts/notarize.sh "$RUNNER_TEMP/app.zip"
+          xcrun stapler staple "$APP_NAME.app"
+
+      - name: Build, sign and notarize DMG
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+          VERSION: ${{ steps.version.outputs.marketing }}
+        run: |
+          DMG="Local-Flow-$VERSION.dmg"
+          echo "dmg=$DMG" >> "$GITHUB_ENV"
+          # Finder-laid-out image: background, icon positions, volume icon (see scripts/build-dmg.sh).
+          scripts/build-dmg.sh "$APP_NAME.app" "$DMG"
+          codesign --sign "Developer ID Application" --timestamp "$DMG"
+          scripts/notarize.sh "$DMG"
+          xcrun stapler staple "$DMG"
+          spctl --assess --type open --context context:primary-signature -v "$DMG"
+          # Unversioned copy so /releases/latest/download/Local-Flow.dmg is a stable link.
+          cp "$DMG" Local-Flow.dmg
+
+      - name: Publish GitHub Release
+        if: steps.version.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.marketing }}
+          target_commitish: ${{ github.sha }}   # tag the commit that was built, even if master moved on
+          files: |
+            ${{ env.dmg }}
+            Local-Flow.dmg
+          generate_release_notes: true
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: |
+            ${{ env.dmg }}
+            Local-Flow.dmg
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/AuthKey.p8"
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true

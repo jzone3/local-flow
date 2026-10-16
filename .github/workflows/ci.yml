@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - run: scripts/fetch-whisper.sh
+      - run: xcodegen generate
+      - run: >
+          xcodebuild -project LocalFlow.xcodeproj -scheme LocalFlow
+          -configuration Debug -derivedDataPath build
+          CODE_SIGNING_ALLOWED=NO build | tail -20
+      - run: scripts/test-core.sh
