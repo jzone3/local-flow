@@ -4,44 +4,89 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Local Flow — private dictation for Mac</title>
-<meta name="description" content="Open-source, privacy-first dictation for the Mac. Hold a key, talk, let go. Whisper runs on your Mac; history is gone when you quit.">
+<meta name="description" content="Open-source, private dictation for the Mac. Hold fn, talk, let go. Whisper runs on your Mac; nothing is kept.">
 <meta property="og:title" content="Local Flow">
-<meta property="og:description" content="Open-source, privacy-first dictation for the Mac.">
-<link rel="icon" href="favicon.png">
+<meta property="og:description" content="Open-source, private dictation for the Mac.">
 <meta property="og:image" content="https://local-flow.vercel.app/icon.png">
+<link rel="icon" href="favicon.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
-  <header>
-    <img class="mark" src="icon.png" alt="" width="96" height="96">
+  <header class="hero">
+    <img class="mark" src="icon.png" alt="" width="88" height="88">
     <h1>Local Flow</h1>
-    <p class="lede">Hold a key. Talk. Let go. Your words appear wherever your cursor is — and nothing leaves your Mac.</p>
-    <p class="cta">
+    <p class="lede">Hold fn. Talk. Let go. Your words land wherever your cursor is — and nothing leaves your Mac.</p>
+    <div class="cta">
       <a class="button" href="https://github.com/jzone3/local-flow/releases/latest/download/Local-Flow.dmg">Download for Mac</a>
-      <a class="link" href="https://github.com/jzone3/local-flow">Source on GitHub</a>
-    </p>
-    <p class="fine">macOS 14 or later · Apple silicon and Intel · free and open source</p>
+      <a class="source" href="https://github.com/jzone3/local-flow">Source on GitHub →</a>
+    </div>
+    <p class="fine">macOS 14 or later · Apple silicon and Intel · free, MIT licensed</p>
   </header>
 
-  <section class="bar-demo" aria-label="The dictation bar">
-    <div class="pill">
-      <span class="dot"></span>
-      <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-      <span>Listening</span>
+  <section class="demo" aria-label="Hold fn to dictate">
+    <div class="stage" id="stage">
+      <div class="bar" aria-hidden="true">
+        <span class="dot"></span>
+        <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="state"><span class="listening">Listening</span><span class="transcribing">Transcribing</span></span>
+        <span class="mic">MacBook Pro Microphone</span>
+      </div>
+      <div class="kbd" aria-hidden="true">
+        <div class="row">
+          <span class="key w175 mod">caps lock</span>
+          <span class="key">A</span><span class="key">S</span><span class="key">D</span><span class="key">F</span><span class="key">G</span><span class="key">H</span><span class="key">J</span><span class="key">K</span><span class="key">L</span>
+        </div>
+        <div class="row">
+          <span class="key w225 mod">shift</span>
+          <span class="key">Z</span><span class="key">X</span><span class="key">C</span><span class="key">V</span><span class="key">B</span><span class="key">N</span><span class="key">M</span><span class="key">,</span>
+        </div>
+        <div class="row">
+          <span class="key fn mod"><i class="globe"></i>fn</span>
+          <span class="key mod">control</span>
+          <span class="key mod">option</span>
+          <span class="key w125 mod">command</span>
+          <span class="key space"></span>
+        </div>
+      </div>
     </div>
-    <p>The bar while you speak. Liquid Glass on macOS 26.</p>
+    <p class="caption">Hold <kbd>fn</kbd> and speak. Let go and the text is pasted.</p>
   </section>
 
-  <section class="grid">
-    <div><h2>Local</h2><p>Whisper runs on your Mac's GPU. Nothing leaves it unless you pick a cloud model with your own key.</p></div>
+  <section class="features">
+    <div><h2>Local</h2><p>Whisper runs on your Mac. Nothing leaves it unless you choose a cloud model with your own key.</p></div>
     <div><h2>Nothing kept</h2><p>Transcripts and recordings are deleted when you quit.</p></div>
     <div><h2>Open source</h2><p>MIT licensed. One dictionary, word packs for your field, on-device cleanup.</p></div>
   </section>
-
-  <footer>
-    <p>Made by <a href="https://x.com/imjaredz">@imjaredz</a> · Built with <a href="https://devin.ai">Devin</a> · <a href="https://github.com/jzone3/local-flow">GitHub</a></p>
-  </footer>
 </main>
+
+<footer>
+  <p>Made by <a href="https://x.com/imjaredz">@imjaredz</a> · Built with <a href="https://devin.ai">Devin</a> · <a href="https://github.com/jzone3/local-flow">GitHub</a></p>
+</footer>
+
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  if (!stage) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    stage.className = 'stage pressed listening';
+    return;
+  }
+  var steps = [
+    ['stage', 900],
+    ['stage pressed listening', 2400],
+    ['stage transcribing', 1000],
+    ['stage', 1200]
+  ];
+  var i = 0;
+  function next() {
+    stage.className = steps[i][0];
+    var wait = steps[i][1];
+    i = (i + 1) % steps.length;
+    setTimeout(next, wait);
+  }
+  next();
+})();
+</script>
 </body>
 </html>
