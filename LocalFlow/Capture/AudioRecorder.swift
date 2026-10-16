@@ -14,6 +14,7 @@ final class AudioRecorder: ObservableObject {
     /// Level while the Settings mic test is open; audio is not kept.
     @Published private(set) var monitorLevel: Float = 0
     private var monitoring = false
+    private var resumeMonitoring = false
     private var monitorCancellable: AnyCancellable?
 
     private let engine = AVAudioEngine()
@@ -35,6 +36,7 @@ final class AudioRecorder: ObservableObject {
 
     func start() throws {
         guard !isRecording else { return }
+        resumeMonitoring = monitoring
         stopMonitoring()
         samples = []
         let input = engine.inputNode
@@ -108,6 +110,7 @@ final class AudioRecorder: ObservableObject {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         isRecording = false
+        if resumeMonitoring { resumeMonitoring = false; DispatchQueue.main.async { self.startMonitoring() } }
         lock.lock(); let captured = samples; samples = []; lock.unlock()
         let duration = startedAt.map { Date().timeIntervalSince($0) } ?? Double(captured.count) / Self.sampleRate
         DispatchQueue.main.async { self.level = 0; self.levels = Array(repeating: 0, count: self.levels.count) }
@@ -161,6 +164,20 @@ final class AudioRecorder: ObservableObject {
                 for c in 0..<channels { sum += src[c][i] }
                 dst[0][i] = sum * scale
             }
+        }
+        // Averaging quiets a source that sits on one channel of many (−24 dB on a 16-channel device), so bring
+        // the mix back up to the loudest channel's peak. A normal stereo mic (same signal on both) stays at gain 1.
+        var channelPeak: Float = 0
+        for c in 0..<channels {
+            let stride = buffer.format.isInterleaved ? channels : 1
+            let base = buffer.format.isInterleaved ? src[0] + c : src[c]
+            for i in 0..<frames { channelPeak = max(channelPeak, abs(base[i * stride])) }
+        }
+        var monoPeak: Float = 0
+        for i in 0..<frames { monoPeak = max(monoPeak, abs(dst[0][i])) }
+        if monoPeak > 0, channelPeak / monoPeak > 1.001 {
+            let gain = min(Float(channels), channelPeak / monoPeak)
+            for i in 0..<frames { dst[0][i] *= gain }
         }
         return out
     }
