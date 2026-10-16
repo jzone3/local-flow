@@ -231,7 +231,7 @@ struct OnboardingView: View {
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(controller.state == .listening ? Color.red.opacity(0.7) : Color.primary.opacity(0.12), lineWidth: 1)
+                            .strokeBorder(controller.state == .listening ? Color.red.opacity(0.7) : Color.primary.opacity(0.2), lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
                     .animation(.easeInOut(duration: 0.15), value: controller.state == .listening)
