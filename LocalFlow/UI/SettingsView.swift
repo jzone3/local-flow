@@ -214,7 +214,7 @@ struct DictionarySettings: View {
             Text("Words and names spelled your way. One per line; `heard => Correct` forces a replacement. The list is sent to the speech model as a hint and used to fix spelling on this Mac.")
                 .font(.caption).foregroundStyle(.secondary)
             Text("Word packs").font(.subheadline).fontWeight(.medium).padding(.top, 4)
-            PackPicker(columns: 4)
+            PackPicker(columns: 3)
             TextEditor(text: $settings.vocabularyText)
                 .font(.system(.body, design: .monospaced))
                 .frame(minHeight: 240)
