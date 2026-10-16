@@ -2,29 +2,30 @@ import Combine
 import Foundation
 import whisper
 
-/// Whisper models the user can download. Bigger is more accurate; large-v3-turbo is the recommended default.
+/// The three Whisper models the user can pick from. Best is the default; the others trade accuracy for size.
 struct WhisperModel: Identifiable, Equatable {
     let id: String
     let title: String
+    let file: String
     let detail: String
     let bytes: Int64
 
-    var fileName: String { "ggml-\(id).bin" }
+    var fileName: String { "ggml-\(file).bin" }
     var url: URL { URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)")! }
     var sizeText: String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }
 
     static let all: [WhisperModel] = [
-        WhisperModel(id: "large-v3-turbo", title: "Large v3 Turbo", detail: "Best accuracy that still feels instant on Apple silicon. Recommended.", bytes: 1_624_555_275),
-        WhisperModel(id: "large-v3-turbo-q5_0", title: "Large v3 Turbo (compressed)", detail: "Same model, a third of the download, slightly less accurate.", bytes: 574_041_195),
-        WhisperModel(id: "large-v3", title: "Large v3", detail: "Most accurate, several times slower.", bytes: 3_095_033_483),
-        WhisperModel(id: "medium.en", title: "Medium (English)", detail: "Good accuracy, English only.", bytes: 1_533_774_781),
-        WhisperModel(id: "small.en", title: "Small (English)", detail: "Fast, fine for short notes.", bytes: 487_601_967),
-        WhisperModel(id: "base.en", title: "Base (English)", detail: "Tiny download for older or Intel Macs.", bytes: 147_951_465),
+        WhisperModel(id: "large-v3-turbo", title: "Best", file: "large-v3-turbo", detail: "Most accurate. Still instant on Apple silicon.", bytes: 1_624_555_275),
+        WhisperModel(id: "large-v3-turbo-q5_0", title: "Classic", file: "large-v3-turbo-q5_0", detail: "Same model, a third of the size. Nearly as accurate.", bytes: 574_041_195),
+        WhisperModel(id: "base", title: "Tiny", file: "base", detail: "Small and fast. Fine for short notes and older Macs.", bytes: 147_951_465),
     ]
 
     static let recommended = all[0]
 
-    static func named(_ id: String) -> WhisperModel { all.first { $0.id == id } ?? recommended }
+    /// Older builds stored other model IDs; those map to the nearest tier.
+    static func named(_ id: String) -> WhisperModel {
+        all.first { $0.id == id } ?? (["large-v3", "medium.en", "medium"].contains(id) ? recommended : id.hasPrefix("small") ? all[1] : id.hasPrefix("base") ? all[2] : recommended)
+    }
 
     static var directory: URL {
         let dir = AppSettings.supportDirectory.appendingPathComponent("Models", isDirectory: true)

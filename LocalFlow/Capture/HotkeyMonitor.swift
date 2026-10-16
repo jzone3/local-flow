@@ -11,6 +11,8 @@ final class HotkeyMonitor {
     private var globalMonitors: [Any] = []
     private var localMonitors: [Any] = []
     private(set) var isDown = false
+    /// Set while dictating hands-free so Esc still cancels although the key is up.
+    var escapeArmed = false
     private var hotkey: Hotkey
 
     init(hotkey: Hotkey) {
@@ -50,8 +52,9 @@ final class HotkeyMonitor {
     /// Returns true when the event belonged to the hotkey and should not reach the app.
     @discardableResult
     private func handle(_ event: NSEvent) -> Bool {
-        if isDown, event.type == .keyDown, event.keyCode == 53 {  // Esc cancels
+        if isDown || escapeArmed, event.type == .keyDown, event.keyCode == 53 {  // Esc cancels
             isDown = false
+            escapeArmed = false
             onCancel?()
             return true
         }

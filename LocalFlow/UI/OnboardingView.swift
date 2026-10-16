@@ -214,7 +214,7 @@ struct OnboardingView: View {
 
     private var done: some View {
         VStack(spacing: 26) {
-            header("You're set", "Hold \(settings.hotkey.displayName) anywhere and start talking.", icon: "check-circle")
+            header("You're set", "Hold \(settings.hotkey.displayName) anywhere and talk.\nDouble-tap it to keep listening hands-free; tap again to stop.", icon: "check-circle")
             VStack(spacing: 0) {
                 row("keyboard", "Let go to paste", "Press Esc while holding to cancel.")
                 rowDivider

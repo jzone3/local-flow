@@ -74,7 +74,8 @@ struct DictationBarView: View {
                     .overlay(Circle().stroke(.red.opacity(0.4), lineWidth: 6).scaleEffect(1 + CGFloat(recorder.level)))
                 Waveform(levels: recorder.levels)
                     .frame(width: 150, height: 28)
-                Text("Listening").font(.system(size: 13, weight: .medium)).foregroundStyle(.primary)
+                Text(controller.handsFree ? "Listening · tap \(AppSettings.shared.hotkey.displayName) to stop" : "Listening")
+                    .font(.system(size: 13, weight: .medium)).foregroundStyle(.primary)
             }
         case .transcribing:
             HStack(spacing: 12) {

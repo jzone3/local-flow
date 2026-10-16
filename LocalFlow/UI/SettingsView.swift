@@ -21,7 +21,7 @@ struct GeneralSettings: View {
         Form {
             Section("Hotkey") {
                 HotkeyRecorder(hotkey: $settings.hotkey)
-                Text("Hold it to talk, let go to paste. Press Esc while holding to cancel.")
+                Text("Hold it to talk, let go to paste. Double-tap to keep listening hands-free; tap again to stop. Esc cancels.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Feedback") {
@@ -172,35 +172,57 @@ struct ModelList: View {
     @ObservedObject private var downloader = ModelDownloader.shared
 
     var body: some View {
-        ForEach(WhisperModel.all) { model in
-            HStack(alignment: .firstTextBaseline) {
-                Button {
+        VStack(spacing: 8) {
+            ForEach(WhisperModel.all) { model in
+                let selected = settings.localModelID == model.id
+                HStack(spacing: 12) {
+                    Radio(on: selected)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 8) {
+                            Text(model.title).fontWeight(.semibold)
+                            Text(model.sizeText).font(.caption).foregroundStyle(.secondary)
+                            if model == WhisperModel.recommended {
+                                Text("Default").font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Color.accentColor.opacity(0.12), in: Capsule())
+                            }
+                        }
+                        Text(model.detail).font(.caption).foregroundStyle(.secondary)
+                        if let error = downloader.errors[model.id] {
+                            Text(error).font(.caption).foregroundStyle(.red)
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    trailing(model)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard model.isDownloaded else { return }
                     settings.localModelID = model.id
                     LocalWhisper.shared.preload()
-                } label: {
-                    Radio(on: settings.localModelID == model.id)
                 }
-                .buttonStyle(.plain)
-                .disabled(!model.isDownloaded)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.title).fontWeight(settings.localModelID == model.id ? .semibold : .regular)
-                    Text("\(model.detail) \(model.sizeText).").font(.caption).foregroundStyle(.secondary)
-                    if let error = downloader.errors[model.id] {
-                        Text(error).font(.caption).foregroundStyle(.red)
-                    }
-                }
-                Spacer()
-                if let progress = downloader.progress[model.id] {
-                    ProgressView(value: progress).frame(width: 90)
-                    Button("Cancel") { downloader.cancel(model) }.actionButton().controlSize(.small)
-                } else if model.isDownloaded {
-                    Label { Text("Downloaded") } icon: { Icon("check", size: 11) }.font(.caption).foregroundStyle(.green)
-                    Button("Delete") { downloader.delete(model) }.actionButton().controlSize(.small)
-                } else {
-                    Button("Download") { downloader.download(model) }.actionButton(prominent: true).controlSize(.small)
-                }
+                .background(selected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(selected ? Color.accentColor.opacity(0.7) : Color(nsColor: .separatorColor), lineWidth: selected ? 1.5 : 1)
+                )
+                .id("\(model.id)-\(downloader.installedVersion)")
             }
-            .id("\(model.id)-\(downloader.installedVersion)")
+        }
+    }
+
+    @ViewBuilder
+    private func trailing(_ model: WhisperModel) -> some View {
+        if let progress = downloader.progress[model.id] {
+            ProgressView(value: progress).frame(width: 90)
+            Button("Cancel") { downloader.cancel(model) }.actionButton().controlSize(.small)
+        } else if model.isDownloaded {
+            Label { Text("Downloaded") } icon: { Icon("check", size: 11) }.font(.caption).foregroundStyle(.green)
+            Button("Delete") { downloader.delete(model) }.actionButton().controlSize(.small)
+        } else {
+            Button("Download") { downloader.download(model) }.actionButton(prominent: true).controlSize(.small)
         }
     }
 }
@@ -277,6 +299,8 @@ struct AboutSettings: View {
                     .disabled(checker.isChecking)
                     .actionButton(prominent: true)
                 Button("GitHub") { NSWorkspace.shared.open(URL(string: "https://github.com/jzone3/local-flow")!) }
+                    .actionButton()
+                Button("@imjaredz") { NSWorkspace.shared.open(URL(string: "https://x.com/imjaredz")!) }
                     .actionButton()
             }
             .padding(.top, 8)

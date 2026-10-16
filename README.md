@@ -2,8 +2,8 @@
 
 Open-source, privacy-first dictation for the Mac. Hold a key, talk, let go — your words are typed wherever your cursor is.
 
-- **Hold to talk.** Fn by default; pick any key in Settings. A small Liquid Glass bar shows while you speak.
-- **Local by default.** Whisper (whisper.cpp with Metal) runs on your Mac. Download the model you want — large-v3-turbo is recommended.
+- **Hold to talk.** Fn by default; pick any key in Settings. Double-tap it to keep listening hands-free, tap again to stop. A small Liquid Glass bar shows while you speak.
+- **Local by default.** Whisper (whisper.cpp with Metal) runs on your Mac. Three models to pick from — Best (default), Classic, Tiny — downloaded in-app.
 - **Or bring your own key.** OpenAI, ElevenLabs Scribe or Gemini, with retries and automatic fallback to the local model. Setup finds keys already in your shell environment.
 - **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup lets you add word packs for your field (engineering, product, sales, legal…).
 - **Cleanup that never leaves your Mac.** Ums and uhs, capitalisation, punctuation and "new paragraph" are handled with rules, not a model. On by default, one toggle to turn off.

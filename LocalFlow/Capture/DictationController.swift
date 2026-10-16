@@ -3,6 +3,7 @@ import Combine
 import Foundation
 
 /// The hold-to-talk state machine: hotkey down → record and show the bar; up → transcribe, paste, save to history.
+/// Double-tap the hotkey to keep listening hands-free; the next tap stops.
 @MainActor
 final class DictationController: ObservableObject {
     static let shared = DictationController()
@@ -20,6 +21,7 @@ final class DictationController: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var lastWarning: String?
     @Published private(set) var permissionProblem: String?
+    @Published private(set) var handsFree = false
 
     let recorder = AudioRecorder()
     private let settings = AppSettings.shared
@@ -29,10 +31,15 @@ final class DictationController: ObservableObject {
     private var hideWork: DispatchWorkItem?
     private var cancellables: Set<AnyCancellable> = []
     private var startedAt: Date?
+    private var pressedAt: Date?
+    private var lastTapAt: Date?
+    private var ignoreNextRelease = false
+    private let tapMaxHold: TimeInterval = 0.3
+    private let doubleTapWindow: TimeInterval = 0.5
 
     var statusLine: String {
         switch state {
-        case .idle: return "Hold \(settings.hotkey.displayName) to dictate"
+        case .idle: return "Hold or double-tap \(settings.hotkey.displayName) to dictate"
         case .listening: return "Listening…"
         case .transcribing: return "Transcribing…"
         case .done: return "Pasted"
@@ -41,8 +48,8 @@ final class DictationController: ObservableObject {
     }
 
     func start() {
-        hotkey.onPress = { [weak self] in self?.beginRecording() }
-        hotkey.onRelease = { [weak self] in self?.endRecording() }
+        hotkey.onPress = { [weak self] in self?.hotkeyPressed() }
+        hotkey.onRelease = { [weak self] in self?.hotkeyReleased() }
         hotkey.onCancel = { [weak self] in self?.cancel() }
         hotkey.start()
         settings.$hotkey.dropFirst().sink { [weak self] key in self?.hotkey.update(hotkey: key) }.store(in: &cancellables)
@@ -58,6 +65,30 @@ final class DictationController: ObservableObject {
         } else {
             permissionProblem = nil
         }
+    }
+
+    private func hotkeyPressed() {
+        if handsFree {
+            ignoreNextRelease = true
+            endRecording()
+            return
+        }
+        pressedAt = Date()
+        beginRecording()
+    }
+
+    private func hotkeyReleased() {
+        if ignoreNextRelease { ignoreNextRelease = false; return }
+        let now = Date()
+        let wasTap = pressedAt.map { now.timeIntervalSince($0) < tapMaxHold } ?? false
+        if wasTap, let last = lastTapAt, now.timeIntervalSince(last) < doubleTapWindow, state == .listening {
+            handsFree = true
+            hotkey.escapeArmed = true
+            lastTapAt = nil
+            return
+        }
+        lastTapAt = wasTap ? now : nil
+        endRecording()
     }
 
     private func beginRecording() {
@@ -80,6 +111,8 @@ final class DictationController: ObservableObject {
     }
 
     private func endRecording() {
+        handsFree = false
+        hotkey.escapeArmed = false
         guard state == .listening else { return }
         let (samples, duration) = recorder.stop()
         guard duration > 0.35, samples.contains(where: { abs($0) > 0.005 }) else {
@@ -119,6 +152,8 @@ final class DictationController: ObservableObject {
     }
 
     func cancel() {
+        handsFree = false
+        hotkey.escapeArmed = false
         transcription?.cancel()
         if recorder.isRecording { _ = recorder.stop() }
         state = .idle
