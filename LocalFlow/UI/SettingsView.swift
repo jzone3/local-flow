@@ -10,7 +10,6 @@ struct SettingsView: View {
             AboutSettings().tabItem { Label("About", systemImage: "info.circle") }
         }
         .padding(20)
-        .background(WindowBackground().ignoresSafeArea())
     }
 }
 
@@ -41,7 +40,7 @@ struct GeneralSettings: View {
                         }
                         Button("Re-check") { controller.refreshPermissions() }
                     }
-                    .glassButton()
+                    .actionButton()
                 } else {
                     Label("Accessibility and microphone access granted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                 }
@@ -116,13 +115,13 @@ struct CloudSettings: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { saved = false }
                 }
                 .disabled(key.isEmpty)
-                .glassButton(prominent: true)
+                .actionButton(prominent: true)
             }
             HStack {
                 if provider.apiKey != nil {
                     Label("Key stored in your Keychain", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     Button("Remove") { Keychain.delete(provider.keychainAccount); key = ""; keyChanged += 1 }
-                        .glassButton().controlSize(.small)
+                        .actionButton().controlSize(.small)
                 } else {
                     Label("No key saved", systemImage: "key").foregroundStyle(.secondary)
                 }
@@ -156,7 +155,7 @@ struct EnvironmentKeyPicker: View {
                 Text("Found \(item.name) in \(item.source) (\(EnvironmentKeys.masked(item.value)))").font(.caption)
                 Spacer()
                 Button("Use it") { Keychain.set(item.value, for: provider.keychainAccount); found = []; onUse() }
-                    .glassButton().controlSize(.small)
+                    .actionButton().controlSize(.small)
             }
         }
     }
@@ -193,12 +192,12 @@ struct ModelList: View {
                 Spacer()
                 if let progress = downloader.progress[model.id] {
                     ProgressView(value: progress).frame(width: 90)
-                    Button("Cancel") { downloader.cancel(model) }.glassButton().controlSize(.small)
+                    Button("Cancel") { downloader.cancel(model) }.actionButton().controlSize(.small)
                 } else if model.isDownloaded {
                     Label("Downloaded", systemImage: "checkmark").font(.caption).foregroundStyle(.green)
-                    Button("Delete") { downloader.delete(model) }.glassButton().controlSize(.small)
+                    Button("Delete") { downloader.delete(model) }.actionButton().controlSize(.small)
                 } else {
-                    Button("Download") { downloader.download(model) }.glassButton(prominent: true).controlSize(.small)
+                    Button("Download") { downloader.download(model) }.actionButton(prominent: true).controlSize(.small)
                 }
             }
             .id("\(model.id)-\(downloader.installedVersion)")
@@ -221,8 +220,8 @@ struct DictionarySettings: View {
             HStack {
                 Text("\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button("Suggest Terms for Me…") { showBuilder = true }.glassButton(prominent: true)
-                Button("Reset to Default") { settings.vocabularyText = Vocabulary.defaultText }.glassButton()
+                Button("Suggest Terms for Me…") { showBuilder = true }.actionButton(prominent: true)
+                Button("Reset to Default") { settings.vocabularyText = Vocabulary.defaultText }.actionButton()
             }
         }
         .sheet(isPresented: $showBuilder) { DictionaryBuilderSheet(onDone: { showBuilder = false }) }
@@ -272,12 +271,12 @@ struct DictionaryBuilderSheet: View {
             }
             if let error { Text(error).foregroundStyle(.red).font(.caption) }
             HStack {
-                Button("Cancel") { onDone() }.glassButton()
+                Button("Cancel") { onDone() }.actionButton()
                 Spacer()
                 if suggestions.isEmpty {
                     Button(busy ? "Thinking…" : "Suggest Terms") { suggest() }
                         .disabled(busy || answer.trimmingCharacters(in: .whitespaces).count < 8 || provider == nil)
-                        .glassButton(prominent: true)
+                        .actionButton(prominent: true)
                         .keyboardShortcut(.defaultAction)
                 } else {
                     Button("Add \(selected.count) Terms") {
@@ -285,7 +284,7 @@ struct DictionaryBuilderSheet: View {
                         onDone()
                     }
                     .disabled(selected.isEmpty)
-                    .glassButton(prominent: true)
+                    .actionButton(prominent: true)
                     .keyboardShortcut(.defaultAction)
                 }
             }
@@ -334,7 +333,7 @@ struct PrivacySettings: View {
                     Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([history.directory]) }
                     Button("Delete All Now", role: .destructive) { history.clear() }
                 }
-                .glassButton()
+                .actionButton()
             }
         }
         .formStyle(.grouped)
@@ -358,9 +357,9 @@ struct AboutSettings: View {
             HStack {
                 Button(checker.isChecking ? "Checking…" : "Check for Updates") { checker.check(userInitiated: true) }
                     .disabled(checker.isChecking)
-                    .glassButton(prominent: true)
+                    .actionButton(prominent: true)
                 Button("GitHub") { NSWorkspace.shared.open(URL(string: "https://github.com/jzone3/local-flow")!) }
-                    .glassButton()
+                    .actionButton()
             }
             .padding(.top, 8)
         }
@@ -380,7 +379,7 @@ struct HotkeyRecorder: View {
             Spacer()
             Button(recording ? "Press a key…" : hotkey.displayName) { recording ? stop() : begin() }
                 .frame(minWidth: 120)
-                .glassButton(prominent: recording)
+                .actionButton(prominent: recording)
             Menu("Presets") {
                 Button("Fn") { hotkey = .fn }
                 Button("Right ⌥") { hotkey = .rightOption }

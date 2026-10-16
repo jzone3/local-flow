@@ -33,7 +33,6 @@ struct OnboardingView: View {
         .padding(.top, 40)
         .padding(.bottom, 24)
         .frame(width: Self.windowSize.width, height: Self.windowSize.height)
-        .background(WindowBackground().ignoresSafeArea())
         .animation(.easeInOut(duration: 0.2), value: step)
         .onAppear { foundKeys = EnvironmentKeys.scan() }
         .sheet(isPresented: $showBuilder) { DictionaryBuilderSheet(onDone: { showBuilder = false }) }
@@ -53,12 +52,12 @@ struct OnboardingView: View {
             .animation(.spring(duration: 0.3), value: step)
             HStack {
                 if step > 0 {
-                    Button("Back") { step -= 1 }.glassButton()
+                    Button("Back") { step -= 1 }.actionButton()
                 }
                 Spacer()
                 if step < stepCount - 1 {
                     Button("Continue") { step += 1 }
-                        .glassButton(prominent: true)
+                        .actionButton(prominent: true)
                         .keyboardShortcut(.defaultAction)
                 } else {
                     Button("Start Dictating") {
@@ -66,7 +65,7 @@ struct OnboardingView: View {
                         LocalWhisper.shared.preload()
                         WindowManager.shared.close("onboarding")
                     }
-                    .glassButton(prominent: true)
+                    .actionButton(prominent: true)
                     .keyboardShortcut(.defaultAction)
                 }
             }
@@ -129,7 +128,7 @@ struct OnboardingView: View {
                 rowDivider
                 row("chevron.left.forwardslash.chevron.right", "Open source", "Add your own models and providers.")
             }
-            .glassCard()
+            .card()
         }
     }
 
@@ -146,7 +145,7 @@ struct OnboardingView: View {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                 }
             }
-            .glassCard()
+            .card()
             .id(controller.permissionProblem)
             Button("Re-check") { controller.refreshPermissions() }
                 .buttonStyle(.plain)
@@ -160,7 +159,7 @@ struct OnboardingView: View {
             if granted {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.title3)
             } else {
-                Button("Allow", action: action).glassButton()
+                Button("Allow", action: action).actionButton()
             }
         }
     }
@@ -194,7 +193,7 @@ struct OnboardingView: View {
                                         Keychain.set(item.value, for: provider.keychainAccount)
                                         settings.cloudProviderID = provider.rawValue
                                     }
-                                    .glassButton()
+                                    .actionButton()
                                     .controlSize(.small)
                                 }
                             }
@@ -213,12 +212,12 @@ struct OnboardingView: View {
             header("Your dictionary", "Names, products and jargon spelled your way.\nYou start with a default list.", icon: "character.book.closed")
             VStack(spacing: 0) {
                 row("sparkles", "Build it from one question", "Tell Local Flow who you are and what you do; it suggests words to add. The answer is only used for that request and is never saved.") {
-                    Button("Answer…") { showBuilder = true }.glassButton(prominent: true)
+                    Button("Answer…") { showBuilder = true }.actionButton(prominent: true)
                 }
                 rowDivider
                 row("pencil", "Or edit it later", "\(settings.vocabulary.terms.count) terms so far. Settings → Dictionary.")
             }
-            .glassCard()
+            .card()
         }
     }
 
@@ -234,7 +233,7 @@ struct OnboardingView: View {
                 rowDivider
                 row("menubar.rectangle", "Menu bar", "Settings, History and updates live there.")
             }
-            .glassCard()
+            .card()
             if controller.permissionProblem != nil {
                 Label("A permission is still missing; the key won't work until it's granted.", systemImage: "exclamationmark.triangle.fill")
                     .font(.callout).foregroundStyle(.orange)

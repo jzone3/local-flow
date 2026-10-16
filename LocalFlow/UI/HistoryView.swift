@@ -12,7 +12,7 @@ struct HistoryView: View {
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(history.entries) { entry in
-                            HistoryRow(entry: entry, history: history).glassCard(cornerRadius: 14)
+                            HistoryRow(entry: entry, history: history).card(cornerRadius: 14)
                         }
                     }
                     .padding(16)
@@ -23,13 +23,11 @@ struct HistoryView: View {
                 Text("Kept on this Mac only. Auto-deleted after 12 hours.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Delete All", role: .destructive) { history.clear() }
-                    .glassButton()
+                    .actionButton()
                     .disabled(history.entries.isEmpty)
             }
             .padding(12)
         }
-        .padding(.top, 28)
-        .background(WindowBackground().ignoresSafeArea())
     }
 }
 
@@ -57,7 +55,7 @@ private struct HistoryRow: View {
                 Button("Delete", role: .destructive) { history.remove(entry) }
             }
             .font(.caption).foregroundStyle(.secondary)
-            .glassButton()
+            .actionButton()
             .controlSize(.small)
         }
         .padding(14)
