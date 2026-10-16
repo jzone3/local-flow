@@ -183,7 +183,7 @@ enum TextGeneration {
             return text
         case .gemini:
             return try await Gemini.generate(body: ["contents": [["parts": [["text": prompt]]]], "generationConfig": ["temperature": 0.3]],
-                                             model: "gemini-2.5-flash", key: key)
+                                             model: "gemini-3.5-flash", key: key)
         case .elevenLabs:
             throw TranscriptionError.badResponse("ElevenLabs has no text model")
         }
