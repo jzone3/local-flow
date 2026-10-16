@@ -5,14 +5,20 @@ struct LocalFlowApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @ObservedObject private var controller = DictationController.shared
     @ObservedObject private var settings = AppSettings.shared
+    @ObservedObject private var history = HistoryStore.shared
 
     var body: some Scene {
         MenuBarExtra {
             Text(controller.statusLine)
+            Text(settings.engineMode == .local
+                 ? "Local: On · nothing leaves this Mac"
+                 : "Local: Off · Cloud (\(settings.cloudProvider.title))")
             Divider()
             Button("Settings…") { WindowManager.shared.showSettings() }
                 .keyboardShortcut(",")
             Button("History…") { WindowManager.shared.showHistory() }
+            Button("Last Transcript…") { WindowManager.shared.showLastTranscript() }
+                .disabled(history.entries.isEmpty)
             Divider()
             Button("Check for Updates…") { UpdateChecker.shared.check(userInitiated: true) }
             Button("Run Setup Again…") { WindowManager.shared.showOnboarding() }
@@ -52,6 +58,7 @@ final class WindowManager {
 
     func showSettings() { show("settings", title: "Local Flow Settings", size: NSSize(width: 640, height: 560)) { SettingsView() } }
     func showHistory() { show("history", title: "History", size: NSSize(width: 560, height: 480)) { HistoryView() } }
+    func showLastTranscript() { show("last", title: "Last Transcript", size: NSSize(width: 460, height: 260)) { LastTranscriptView() } }
     func showOnboarding() {
         show("onboarding", title: "Welcome to Local Flow", size: OnboardingView.windowSize, fixed: true) { OnboardingView() }
     }
@@ -85,5 +92,43 @@ final class WindowManager {
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
         }
+    }
+}
+
+/// The newest history entry on its own, with a Copy button. Follows the store, so it updates after each dictation.
+struct LastTranscriptView: View {
+    @ObservedObject private var history = HistoryStore.shared
+    @State private var copied = false
+
+    private var entry: HistoryEntry? { history.entries.max { $0.date < $1.date } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let entry {
+                ScrollView {
+                    Text(entry.text)
+                        .font(.system(size: 14))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                HStack {
+                    Text("\(entry.date.formatted(date: .omitted, time: .shortened)) · \(entry.engine)")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(copied ? "Copied" : "Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(entry.text, forType: .string)
+                        copied = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+                    }
+                    .keyboardShortcut("c")
+                }
+            } else {
+                Text("Nothing dictated yet this session.").foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .padding(16)
+        .frame(minWidth: 360, minHeight: 200)
     }
 }
