@@ -364,7 +364,7 @@ struct AboutSettings: View {
                 Button(checker.isChecking ? "Checking…" : "Check for Updates") { checker.check(userInitiated: true) }
                     .disabled(checker.isChecking)
                     .actionButton(prominent: true)
-                Button("GitHub") { NSWorkspace.shared.open(URL(string: "https://github.com/jzone3/local-flow")!) }
+                Button("Source Code") { NSWorkspace.shared.open(Welcome.repoURL) }
                     .actionButton()
                 Button("@imjaredz") { NSWorkspace.shared.open(Welcome.authorURL) }
                     .actionButton()

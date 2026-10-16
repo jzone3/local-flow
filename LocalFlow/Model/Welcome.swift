@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// One-time "thanks for downloading" sheet on first launch; the primary button opens the author's X profile.
+/// One-time "thanks for downloading" sheet on first launch; the Get Started opens the author's X profile behind the app.
 enum Welcome {
     static let shownKey = "welcomeShown"
     static let repoURL = URL(string: "https://github.com/jzone3/local-flow")!
@@ -26,11 +26,18 @@ enum Welcome {
         sheet.center()
         NSApp.runModal(for: sheet)
         sheet.orderOut(nil)
-        NSWorkspace.shared.open(authorURL)
+        openInBackground(authorURL)
         next()
     }
 
     static func dismiss() { NSApp.stopModal() }
+
+    /// Opens the URL without bringing the browser in front of the app.
+    static func openInBackground(_ url: URL) {
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = false
+        NSWorkspace.shared.open(url, configuration: config)
+    }
 }
 
 private struct WelcomeView: View {
@@ -45,7 +52,8 @@ private struct WelcomeView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 12)
-            Text("I built this with Devin, Cognition's AI software engineer. The whole thing is open source.")
+            Text(.init("I built this with [Devin](https://devin.ai), Cognition's AI software engineer. The whole thing is open source."))
+                .tint(.primary)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -53,8 +61,8 @@ private struct WelcomeView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 28)
             HStack(spacing: 10) {
-                pill("GitHub", filled: false) { NSWorkspace.shared.open(Welcome.repoURL) }
-                pill("Let's Talk", filled: true) { Welcome.dismiss() }
+                pill("Source Code", filled: false) { NSWorkspace.shared.open(Welcome.repoURL) }
+                pill("Get Started", filled: true) { Welcome.dismiss() }
                     .keyboardShortcut(.defaultAction)
             }
         }
