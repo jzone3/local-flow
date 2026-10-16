@@ -366,10 +366,14 @@ struct AboutSettings: View {
                     .actionButton(prominent: true)
                 Button("GitHub") { NSWorkspace.shared.open(URL(string: "https://github.com/jzone3/local-flow")!) }
                     .actionButton()
-                Button("@imjaredz") { NSWorkspace.shared.open(URL(string: "https://x.com/imjaredz")!) }
+                Button("@imjaredz") { NSWorkspace.shared.open(Welcome.authorURL) }
                     .actionButton()
             }
             .padding(.top, 8)
+            Button("Built with Devin") { NSWorkspace.shared.open(Welcome.devinURL) }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .font(.callout)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

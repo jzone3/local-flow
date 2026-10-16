@@ -36,12 +36,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         _ = HistoryStore.shared
         DictationController.shared.start()
-        if AppSettings.shared.onboardingDone {
-            LocalWhisper.shared.preload()
-        } else {
-            WindowManager.shared.showOnboarding()
+        Welcome.showIfNeeded {
+            if AppSettings.shared.onboardingDone {
+                LocalWhisper.shared.preload()
+            } else {
+                WindowManager.shared.showOnboarding()
+            }
+            UpdateChecker.shared.checkOnLaunch()
         }
-        UpdateChecker.shared.checkOnLaunch()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
