@@ -52,8 +52,7 @@ private struct WelcomeView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 12)
-            Text(.init("I built this with [Devin](https://devin.ai), Cognition's AI software engineer. The whole thing is open source."))
-                .tint(.primary)
+            Text("I built this with Devin, Cognition's AI software engineer. The whole thing is open source.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -70,6 +69,14 @@ private struct WelcomeView: View {
         .padding(.top, 36)
         .padding(.bottom, 28)
         .frame(width: 400)
+        .overlay(alignment: .topLeading) {
+            Button("Try Devin") { NSWorkspace.shared.open(Welcome.devinURL) }
+                .buttonStyle(.plain)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 14)
+                .padding(.top, 12)
+        }
     }
 
     private func pill(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
