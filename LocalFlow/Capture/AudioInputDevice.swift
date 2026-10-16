@@ -17,7 +17,7 @@ struct AudioInputDevice: Identifiable, Equatable {
         var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &ids) == noErr else { return [] }
         return ids.compactMap { id in
-            guard inputChannelCount(id) > 0, let uid = string(id, kAudioDevicePropertyDeviceUID),
+            guard inputChannelCount(id) > 0, !isPrivateAggregate(id), let uid = string(id, kAudioDevicePropertyDeviceUID),
                   let name = string(id, kAudioObjectPropertyName) else { return nil }
             return AudioInputDevice(id: id, uid: uid, name: name)
         }
@@ -38,6 +38,24 @@ struct AudioInputDevice: Identifiable, Equatable {
         let devices = all
         if let uid = AppSettings.shared.inputDeviceUID, let picked = devices.first(where: { $0.uid == uid }) { return picked }
         return systemDefault ?? devices.first ?? AudioInputDevice(id: 0, uid: "", name: "No microphone")
+    }
+
+    /// CoreAudio creates a hidden aggregate ("CADefaultDeviceAggregate-<pid>-0") for every app that opens the
+    /// default input, including us; it has input channels but is not a microphone the user should see.
+    private static func isPrivateAggregate(_ id: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyTransportType,
+                                                 mScope: kAudioObjectPropertyScopeGlobal,
+                                                 mElement: kAudioObjectPropertyElementMain)
+        var transport: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &transport) == noErr,
+              transport == kAudioDeviceTransportTypeAggregate else { return false }
+        address.mSelector = kAudioAggregateDevicePropertyComposition
+        var composition: CFDictionary? = nil
+        size = UInt32(MemoryLayout<CFDictionary?>.size)
+        let status = withUnsafeMutablePointer(to: &composition) { AudioObjectGetPropertyData(id, &address, 0, nil, &size, $0) }
+        guard status == noErr, let dict = composition as? [String: Any] else { return false }
+        return (dict[kAudioAggregateDeviceIsPrivateKey] as? NSNumber)?.boolValue == true
     }
 
     private static func inputChannelCount(_ id: AudioDeviceID) -> Int {
