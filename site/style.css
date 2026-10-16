@@ -34,31 +34,33 @@ kbd { font: inherit; font-size: 13px; padding: 1px 6px; border: 1px solid var(--
 
 /* keyboard: bottom-left corner of a Mac keyboard */
 .kbd {
-  --gap: calc(var(--k) * 0.14);
-  background: var(--kbd); border-radius: 0 0 0 calc(var(--k) * 0.35);
-  padding: calc(var(--gap) * 2) 0 var(--gap) var(--gap);
+  --gap: calc(var(--k) * 0.16);
+  border: 1px solid var(--line); border-right: 0; border-top: 0;
+  border-radius: 0 0 0 calc(var(--k) * 0.4);
+  padding: calc(var(--gap) * 2) 0 calc(var(--gap) * 1.6) calc(var(--gap) * 1.6);
   display: flex; flex-direction: column; gap: var(--gap);
   overflow: hidden; text-align: left;
-  -webkit-mask-image: linear-gradient(to right, #000 55%, transparent 97%), linear-gradient(to bottom, transparent, #000 45%);
+  -webkit-mask-image: linear-gradient(to right, #000 60%, transparent 98%), linear-gradient(to bottom, transparent, #000 40%);
   -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(to right, #000 55%, transparent 97%), linear-gradient(to bottom, transparent, #000 45%);
+  mask-image: linear-gradient(to right, #000 60%, transparent 98%), linear-gradient(to bottom, transparent, #000 40%);
   mask-composite: intersect;
 }
 .row { display: flex; gap: var(--gap); }
 .key {
   flex: 0 0 auto; width: var(--k); height: var(--k);
-  background: var(--key); border-radius: calc(var(--k) * 0.16);
-  border: 1px solid var(--key-edge); border-bottom-width: 2px;
+  background: transparent; border-radius: calc(var(--k) * 0.18);
+  border: 1px solid var(--line);
   display: flex; align-items: center; justify-content: center;
-  font-size: calc(var(--k) * 0.3); font-weight: 500; color: var(--fg);
-  transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+  font-size: calc(var(--k) * 0.3); font-weight: 500; color: var(--muted);
+  transition: transform .12s ease, background .12s ease, color .12s ease;
 }
 .key.mod { font-size: calc(var(--k) * 0.22); align-items: flex-end; padding-bottom: calc(var(--k) * 0.14); color: var(--muted); }
 .key.w125 { width: calc(var(--k) * 1.25 + var(--gap) * 0.25); }
 .key.w175 { width: calc(var(--k) * 1.75 + var(--gap) * 0.75); }
 .key.w225 { width: calc(var(--k) * 2.25 + var(--gap) * 1.25); }
 .key.space { width: calc(var(--k) * 5 + var(--gap) * 4); }
-.key.fn { position: relative; justify-content: flex-end; padding-right: calc(var(--k) * 0.14); }
+.key.fn { position: relative; justify-content: flex-end; padding-right: calc(var(--k) * 0.14); background: var(--fg); border-color: var(--fg); color: var(--bg); box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+.key.fn .globe, .key.fn .globe::before, .key.fn .globe::after { border-color: var(--bg); }
 .globe {
   position: absolute; top: calc(var(--k) * 0.14); left: calc(var(--k) * 0.14);
   width: calc(var(--k) * 0.3); height: calc(var(--k) * 0.3);
@@ -67,7 +69,8 @@ kbd { font: inherit; font-size: 13px; padding: 1px 6px; border: 1px solid var(--
 .globe::before, .globe::after { content: ""; position: absolute; border: 1.5px solid var(--muted); }
 .globe::before { inset: -1.5px 25%; border-radius: 50%; }
 .globe::after { left: -1.5px; right: -1.5px; top: 50%; height: 0; border-width: 1.5px 0 0; }
-.pressed .key.fn { transform: translateY(1px); background: var(--key-down); border-bottom-width: 1px; }
+.pressed .key.fn { transform: translateY(2px) scale(.96); background: var(--accent, #0a84ff); border-color: var(--accent, #0a84ff); color: #fff; box-shadow: none; }
+.pressed .key.fn .globe, .pressed .key.fn .globe::before, .pressed .key.fn .globe::after { border-color: #fff; }
 
 /* the listening bar */
 .bar {
