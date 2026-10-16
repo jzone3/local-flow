@@ -69,16 +69,15 @@ private struct WelcomeView: View {
             .controlSize(.large)
         }
         .padding(.horizontal, 36)
-        .padding(.top, 36)
+        .padding(.top, 30)
         .padding(.bottom, 28)
         .frame(width: 400)
         .overlay(alignment: .topLeading) {
             Button("Try Devin") { NSWorkspace.shared.open(Welcome.devinURL) }
-                .buttonStyle(.plain)
+                .buttonStyle(.link)
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 14)
-                .padding(.top, 12)
+                .padding(.leading, 12)
+                .padding(.top, 8)
         }
     }
 
