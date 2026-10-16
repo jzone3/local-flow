@@ -356,7 +356,7 @@ struct AboutSettings: View {
                 .resizable()
                 .frame(width: 96, height: 96)
                 .shadow(color: .black.opacity(0.2), radius: 12, y: 6)
-            Text("Local Flow").font(.title.bold())
+            Text("Local Flow").font(.title2.weight(.semibold))
             Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
                 .foregroundStyle(.secondary)
             Text("Open-source, privacy-first dictation for the Mac.").foregroundStyle(.secondary)

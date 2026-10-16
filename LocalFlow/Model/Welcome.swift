@@ -48,7 +48,7 @@ private struct WelcomeView: View {
                 .frame(width: 88, height: 88)
                 .padding(.bottom, 18)
             Text("Thanks for downloading\nLocal Flow")
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .font(.system(size: 20, weight: .semibold))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 12)
@@ -59,11 +59,14 @@ private struct WelcomeView: View {
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 28)
-            HStack(spacing: 10) {
-                pill("Source Code", filled: false) { NSWorkspace.shared.open(Welcome.repoURL) }
-                pill("Get Started", filled: true) { Welcome.dismiss() }
+            HStack(spacing: 12) {
+                Button("Source Code") { NSWorkspace.shared.open(Welcome.repoURL) }
+                    .actionButton()
+                Button("Get Started") { Welcome.dismiss() }
+                    .actionButton(prominent: true)
                     .keyboardShortcut(.defaultAction)
             }
+            .controlSize(.large)
         }
         .padding(.horizontal, 36)
         .padding(.top, 36)
@@ -72,24 +75,11 @@ private struct WelcomeView: View {
         .overlay(alignment: .topLeading) {
             Button("Try Devin") { NSWorkspace.shared.open(Welcome.devinURL) }
                 .buttonStyle(.plain)
-                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .padding(.leading, 14)
                 .padding(.top, 12)
         }
     }
 
-    private func pill(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(filled ? Color(nsColor: .windowBackgroundColor) : Color.primary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 40)
-                .background(filled ? Color.primary : Color.clear, in: Capsule())
-                .overlay(Capsule().strokeBorder(Color.primary.opacity(filled ? 0 : 0.25), lineWidth: 1))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
 }

@@ -43,7 +43,7 @@ struct OnboardingView: View {
             HStack(spacing: 7) {
                 ForEach(0..<stepCount, id: \.self) { i in
                     Capsule()
-                        .fill(i == step ? Color.primary : Color.primary.opacity(0.18))
+                        .fill(i == step ? Color.secondary : Color.secondary.opacity(0.3))
                         .frame(width: i == step ? 22 : 7, height: 7)
                 }
             }
@@ -81,7 +81,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 8)
             }
-            Text(title).font(.system(size: 26, weight: .bold))
+            Text(title).font(.system(size: 24, weight: .semibold))
             Text(subtitle)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
