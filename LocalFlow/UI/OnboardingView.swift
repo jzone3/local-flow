@@ -212,6 +212,8 @@ struct OnboardingView: View {
         }
     }
 
+    @State private var fnConflict = Hotkey.systemDictationUsesFnTwice
+
     private var done: some View {
         VStack(spacing: 26) {
             header("You're set", "Hold \(settings.hotkey.displayName) anywhere and talk.\nDouble-tap it to keep listening hands-free; tap again to stop.", icon: "check-circle")
@@ -223,7 +225,7 @@ struct OnboardingView: View {
                 row("sparkles", "Cleanup is on", "Ums, caps and punctuation are fixed on this Mac. Turn it off in Settings → Privacy.")
                 rowDivider
                 row("menubar", "Menu bar", "Settings, History and updates live there.")
-                if settings.hotkey.isFn {
+                if settings.hotkey.isFn, fnConflict {
                     rowDivider
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                         row("warning", "Turn off macOS Dictation's Fn shortcut", "It also listens for a double-tap of Fn. System Settings → Keyboard → Dictation shortcut → Off.")
@@ -236,6 +238,9 @@ struct OnboardingView: View {
                 }
             }
             .card()
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                fnConflict = Hotkey.systemDictationUsesFnTwice
+            }
             if controller.permissionProblem != nil {
                 Label { Text("A permission is still missing; the key won't work until it's granted.") } icon: { Icon("warning", size: 14) }
                     .font(.callout).foregroundStyle(.orange)

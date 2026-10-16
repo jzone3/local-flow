@@ -97,6 +97,7 @@ struct DictationBarView: View {
                 Icon("check-circle", size: 16).foregroundStyle(.green)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(text).font(.system(size: 13)).lineLimit(2).truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let warning = controller.lastWarning {
                         Label { Text(warning) } icon: { Icon("warning", size: 11) }
                             .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)

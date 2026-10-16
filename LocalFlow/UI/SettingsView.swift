@@ -14,6 +14,7 @@ struct SettingsView: View {
 }
 
 struct GeneralSettings: View {
+    @State private var fnConflict = Hotkey.systemDictationUsesFnTwice
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var controller = DictationController.shared
 
@@ -23,7 +24,7 @@ struct GeneralSettings: View {
                 HotkeyRecorder(hotkey: $settings.hotkey)
                 Text("Hold it to talk, let go to paste. Double-tap to keep listening hands-free; tap again to stop. Esc cancels.")
                     .font(.caption).foregroundStyle(.secondary)
-                if settings.hotkey.isFn {
+                if settings.hotkey.isFn, fnConflict {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Icon("warning", size: 13).foregroundStyle(.orange)
                         Text("macOS also uses a double-tap of Fn for its own Dictation. For hands-free to work, set System Settings → Keyboard → Dictation shortcut to Off.")
@@ -35,6 +36,10 @@ struct GeneralSettings: View {
                         .actionButton().controlSize(.small)
                     }
                 }
+            }
+            .onAppear { fnConflict = Hotkey.systemDictationUsesFnTwice }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+                fnConflict = Hotkey.systemDictationUsesFnTwice
             }
             Section("Feedback") {
                 Toggle("Play a sound when recording starts and stops", isOn: $settings.playSounds)

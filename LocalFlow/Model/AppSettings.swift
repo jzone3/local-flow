@@ -24,6 +24,17 @@ struct Hotkey: Codable, Equatable {
     var isModifierOnly: Bool { Hotkey.modifierKeyCodes[keyCode] != nil }
     var isFn: Bool { keyCode == Hotkey.fn.keyCode }
 
+    /// True when macOS's own Dictation shortcut is "Press Fn twice" (symbolic hotkey 164),
+    /// which fights with our double-tap. Read live from com.apple.symbolichotkeys.
+    static var systemDictationUsesFnTwice: Bool {
+        guard let hotkeys = UserDefaults(suiteName: "com.apple.symbolichotkeys")?
+                .dictionary(forKey: "AppleSymbolicHotKeys"),
+              let entry = hotkeys["164"] as? [String: Any] else { return true }  // stock Macs default to Fn twice
+        let enabled = (entry["enabled"] as? NSNumber)?.boolValue ?? false
+        let params = (entry["value"] as? [String: Any])?["parameters"] as? [NSNumber] ?? []
+        return enabled && params.first?.intValue == 8_388_608
+    }
+
     var displayName: String {
         if let name = Hotkey.modifierKeyCodes[keyCode] { return name }
         var parts: [String] = []
