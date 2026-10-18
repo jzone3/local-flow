@@ -40,7 +40,12 @@ enum TranscriptionError: LocalizedError {
             // Bodies are usually JSON or an HTML error page; neither belongs in the bar.
             var detail = String(body.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160))
             if detail.hasPrefix("{") || detail.hasPrefix("<") || detail.hasPrefix("[") { detail = "" }
-            if status == 401 || status == 403 { detail = "the API key was rejected" }
+            // Gemini answers a bad key with 400 + "API key not valid" / API_KEY_INVALID rather than 401.
+            if status == 401 || status == 403 || body.contains("API_KEY_INVALID")
+                || body.localizedCaseInsensitiveContains("api key not valid")
+                || body.localizedCaseInsensitiveContains("invalid api key") {
+                detail = "the API key was rejected"
+            }
             return "Server error \(status)" + (detail.isEmpty ? "" : ": \(detail)")
         case .network(let error): return error.localizedDescription
         case .badResponse(let why): return "Unexpected response: \(why)"
