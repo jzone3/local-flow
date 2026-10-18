@@ -99,6 +99,10 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
             self.progress[id] = nil
             self.errors[id] = failure
             self.installedVersion += 1
+            // A fresh install picks "Best" by default; if that one isn't on disk, the model just fetched becomes the active one.
+            if failure == nil, !WhisperModel.named(AppSettings.shared.localModelID).isDownloaded {
+                AppSettings.shared.localModelID = id
+            }
         }
     }
 
