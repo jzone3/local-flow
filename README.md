@@ -2,7 +2,7 @@
 
 [![Built by Devin](https://raw.githubusercontent.com/club-cog/built-by-devin/main/badges/built-by-devin.svg)](https://devin.ai)
 
-You speak faster than you type. Local Flow keeps all voice dictation private. Nobody will train on your data and all transcription runs locally.
+You speak faster than you type. Local Flow keeps all voice dictation private. Nobody will train on your data, and all transcription runs locally.
 
 [uselocalflow.app](https://www.uselocalflow.app)
 
@@ -10,7 +10,7 @@ You speak faster than you type. Local Flow keeps all voice dictation private. No
 - **Local by default.** Whisper (whisper.cpp with Metal) runs on your Mac. Three models to pick from — Best (default), Classic, Tiny — downloaded in-app.
 - **Or bring your own key.** OpenAI, ElevenLabs Scribe or Gemini, with retries and automatic fallback to the local model. Setup finds keys already in your shell environment.
 - **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup lets you add word packs for your field (engineering, product, sales, legal…).
-- **Cleanup that never leaves your Mac.** Ums and uhs, capitalisation, punctuation and "new paragraph" are handled with rules, not a model. On by default, one toggle to turn off.
+- **Cleanup that never leaves your Mac.** Ums and uhs, capitalization, punctuation and "new paragraph" are handled with rules, not a model. On by default, one toggle to turn off.
 - **Short-lived history.** Transcripts and recordings stay on your Mac only while the app is running — wiped when you quit (and on launch), and never kept longer than 12 hours.
 - **Self-updating.** Checks GitHub Releases once a day and installs the new DMG in place.
 
