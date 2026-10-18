@@ -1,3 +1,4 @@
+import Carbon.HIToolbox
 import SwiftUI
 
 @main
@@ -33,6 +34,13 @@ struct LocalFlowApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A second copy would add a second menu bar icon and paste every dictation twice.
+        if let bundleID = Bundle.main.bundleIdentifier,
+           NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+               .contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) {
+            NSApp.terminate(nil)
+            return
+        }
         NSApp.setActivationPolicy(.accessory)
         _ = HistoryStore.shared
         DictationController.shared.start()
@@ -95,6 +103,12 @@ final class WindowManager {
         windows[key] = window
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
+        }
+        // A focused API-key field holds Secure Event Input even after the user switches apps, and the
+        // next dictation's ⌘V would land in it instead of the frontmost app. Drop focus when the window
+        // stops being key.
+        NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak window] _ in
+            if IsSecureEventInputEnabled() { window?.makeFirstResponder(nil) }
         }
         return window
     }

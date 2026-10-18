@@ -71,6 +71,11 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
         try? FileManager.default.removeItem(at: model.localURL)
         LocalWhisper.shared.unloadIfCurrent(model)
         installedVersion += 1
+        // Keep the selection on a model that exists, or dictation fails until the user notices the radio.
+        if AppSettings.shared.localModelID == model.id,
+           let next = WhisperModel.all.first(where: { $0.isDownloaded }) {
+            AppSettings.shared.localModelID = next.id
+        }
     }
 
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
@@ -146,7 +151,7 @@ final class LocalWhisper: TranscriptionProvider {
 
     private func loadedContext(for model: WhisperModel) throws -> OpaquePointer {
         if let context, loadedModelID == model.id { return context }
-        guard model.isDownloaded else { throw TranscriptionError.modelMissing }
+        guard model.isDownloaded else { throw TranscriptionError.modelMissing(model.title) }
         if let context { whisper_free(context); self.context = nil }
         var params = whisper_context_default_params()
         params.use_gpu = true

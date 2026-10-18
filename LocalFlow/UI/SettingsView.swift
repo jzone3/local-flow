@@ -307,7 +307,7 @@ struct DictionarySettings: View {
                 .frame(minHeight: 240)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
             HStack {
-                Text("\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
+                Text(settings.vocabulary.terms.count == 1 ? "1 term" : "\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Reset to Default") {
                     settings.vocabularyText = Vocabulary.defaultText

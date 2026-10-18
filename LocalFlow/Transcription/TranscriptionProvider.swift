@@ -18,7 +18,7 @@ enum TranscriptionError: LocalizedError {
     case http(status: Int, body: String)
     case network(Error)
     case badResponse(String)
-    case modelMissing
+    case modelMissing(String)
     case modelFailed(String)
     case cancelled
     case allFailed(primary: Error, fallback: Error?)
@@ -44,7 +44,11 @@ enum TranscriptionError: LocalizedError {
             return "Server error \(status)" + (detail.isEmpty ? "" : ": \(detail)")
         case .network(let error): return error.localizedDescription
         case .badResponse(let why): return "Unexpected response: \(why)"
-        case .modelMissing: return "No local Whisper model downloaded yet. Pick one in Settings → Transcription."
+        case .modelMissing(let title):
+            if WhisperModel.all.contains(where: { $0.isDownloaded }) {
+                return "Whisper \(title) isn't downloaded. Pick a downloaded model in Settings → Transcription."
+            }
+            return "No local Whisper model downloaded yet. Pick one in Settings → Transcription."
         case .modelFailed(let why): return "Local model failed: \(why)"
         case .cancelled: return "Cancelled"
         case .allFailed(let primary, let fallback):
