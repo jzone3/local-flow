@@ -100,7 +100,11 @@ final class DictationController: ObservableObject {
         transcription?.cancel()
         hideWork?.cancel()
         guard AudioRecorder.hasPermission else {
-            Task { if await AudioRecorder.requestPermission() { self.refreshPermissions() } }
+            if AudioRecorder.isDenied {
+                show(failure: "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone.")
+            } else {
+                Task { if await AudioRecorder.requestPermission() { self.refreshPermissions() } }
+            }
             return
         }
         do {
