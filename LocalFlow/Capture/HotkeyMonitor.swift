@@ -2,7 +2,8 @@ import AppKit
 import ApplicationServices
 
 /// Watches the configured hotkey system-wide and reports press/release so holding it records.
-/// Needs Accessibility permission (for events in other apps); without it only Local Flow's own windows see keys.
+/// With Accessibility granted this is a CGEvent tap, which sees every key (Esc included) and can swallow the ones
+/// it handles; without it, NSEvent monitors see modifier keys everywhere but other keys only in Local Flow's windows.
 final class HotkeyMonitor {
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
@@ -10,6 +11,8 @@ final class HotkeyMonitor {
 
     private var globalMonitors: [Any] = []
     private var localMonitors: [Any] = []
+    private var tap: CFMachPort?
+    private var tapSource: CFRunLoopSource?
     private(set) var isDown = false
     /// Set while dictating hands-free so Esc still cancels although the key is up.
     var escapeArmed = false
@@ -31,8 +34,11 @@ final class HotkeyMonitor {
         AXIsProcessTrustedWithOptions(options)
     }
 
+    var usesEventTap: Bool { tap != nil }
+
     func start() {
         stop()
+        if installEventTap() { return }
         let mask: NSEvent.EventTypeMask = [.flagsChanged, .keyDown, .keyUp]
         globalMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] event in
             self?.handle(event)
@@ -47,6 +53,39 @@ final class HotkeyMonitor {
         (globalMonitors + localMonitors).forEach { NSEvent.removeMonitor($0) }
         globalMonitors = []
         localMonitors = []
+        if let tapSource { CFRunLoopRemoveSource(CFRunLoopGetMain(), tapSource, .commonModes) }
+        if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
+        tapSource = nil
+        tap = nil
+    }
+
+    /// An active session tap needs Accessibility; `tapCreate` returns nil without it.
+    private func installEventTap() -> Bool {
+        guard Self.hasAccessibility else { return false }
+        let events: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
+        let callback: CGEventTapCallBack = { _, type, event, userInfo in
+            guard let userInfo else { return Unmanaged.passUnretained(event) }
+            let monitor = Unmanaged<HotkeyMonitor>.fromOpaque(userInfo).takeUnretainedValue()
+            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                if let tap = monitor.tap { CGEvent.tapEnable(tap: tap, enable: true) }
+                return Unmanaged.passUnretained(event)
+            }
+            guard let nsEvent = NSEvent(cgEvent: event) else { return Unmanaged.passUnretained(event) }
+            let handled = monitor.handle(nsEvent)
+            // Modifier changes (fn, right option…) still reach the system so its own fn shortcuts keep working; a
+            // handled key (Esc cancel, a key-combo hotkey) is swallowed so the front app doesn't type or act on it.
+            if handled, type != .flagsChanged { return nil }
+            return Unmanaged.passUnretained(event)
+        }
+        guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                                          eventsOfInterest: events, callback: callback,
+                                          userInfo: Unmanaged.passUnretained(self).toOpaque()) else { return false }
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        self.tap = tap
+        tapSource = source
+        return true
     }
 
     /// Returns true when the event belonged to the hotkey and should not reach the app.

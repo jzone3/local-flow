@@ -25,6 +25,19 @@ expect(TextCleanup.clean("hmm"), "", "only filler")
 expect(TextCleanup.clean("ok. um. fine"), "Ok. Fine", "filler as sentence")
 expect(TextCleanup.clean("Um, so I pushed", options: .init(removeFillers: false)), "Um, so I pushed", "fillers kept when off")
 
+expect(TextCleanup.isHallucination("Thanks for watching!"), "hallucination: thanks for watching")
+expect(TextCleanup.isHallucination(" you "), "hallucination: lone you")
+expect(TextCleanup.isHallucination(""), "hallucination: empty")
+expect(!TextCleanup.isHallucination("Thank you for the help today."), "real sentence kept")
+expect(!TextCleanup.isHallucination("Thank you."), "short real reply kept")
+expect(TextCleanup.fit("And more words.", before: "re", after: ""), " And more words.", "fit: space after word")
+expect(TextCleanup.fit("Middle.", before: "rt", after: " end"), " Middle.", "fit: space before, none before existing space")
+expect(TextCleanup.fit("Middle", before: "rt", after: "end"), " Middle ", "fit: space both sides")
+expect(TextCleanup.fit("Hello", before: "", after: ""), "Hello", "fit: empty field untouched")
+expect(TextCleanup.fit("Hello", before: "e ", after: ""), "Hello", "fit: after a space untouched")
+expect(TextCleanup.fit("Hello", before: "e\n", after: ""), "Hello", "fit: after newline untouched")
+expect(TextCleanup.fit("quoted", before: "(\"", after: "\")"), "quoted", "fit: inside quotes/brackets untouched")
+
 // Vocabulary
 let vocab = Vocabulary(text: """
 # comment

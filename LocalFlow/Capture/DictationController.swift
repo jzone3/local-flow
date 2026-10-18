@@ -38,6 +38,7 @@ final class DictationController: ObservableObject {
     private var ignoreNextRelease = false
     private let tapMaxHold: TimeInterval = 0.3
     private let doubleTapWindow: TimeInterval = 0.5
+    private static let microphoneOff = "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone."
 
     var statusLine: String {
         switch state {
@@ -69,6 +70,7 @@ final class DictationController: ObservableObject {
         } else {
             permissionProblem = nil
         }
+        if hasAccessibility, !hotkey.usesEventTap { hotkey.start() }  // upgrade to the event tap once trusted
     }
 
     private func hotkeyPressed() {
@@ -101,7 +103,7 @@ final class DictationController: ObservableObject {
         hideWork?.cancel()
         guard AudioRecorder.hasPermission else {
             if AudioRecorder.isDenied {
-                show(failure: "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone.")
+                show(failure: Self.microphoneOff)
             } else {
                 Task { if await AudioRecorder.requestPermission() { self.refreshPermissions() } }
             }
@@ -123,9 +125,15 @@ final class DictationController: ObservableObject {
         hotkey.escapeArmed = false
         guard state == .listening else { return }
         let (samples, duration) = recorder.stop()
-        guard duration > 0.35, samples.contains(where: { abs($0) > 0.005 }) else {
-            state = .idle
-            bar.hide()
+        // Needs ~50 ms of samples above the room-noise floor, or Whisper invents a sentence for the silence.
+        let voiced = samples.lazy.filter { abs($0) > 0.02 }.count
+        guard duration > 0.35, voiced >= 800 else {
+            if !AudioRecorder.hasPermission {
+                show(failure: Self.microphoneOff)  // revoked while running: the engine delivers silence
+            } else {
+                state = .idle
+                bar.hide()
+            }
             return
         }
         state = .transcribing
@@ -140,7 +148,7 @@ final class DictationController: ObservableObject {
                 let outcome = try await TranscriptionService().transcribe(samples: samples)
                 guard !Task.isCancelled else { return }
                 lastWarning = outcome.warning.map(Self.friendly)
-                if outcome.text.isEmpty {
+                if TextCleanup.isHallucination(outcome.text) {
                     show(failure: "Didn't catch anything.")
                     try? FileManager.default.removeItem(at: audioURL)
                     return

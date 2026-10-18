@@ -23,6 +23,37 @@ enum TextCleanup {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Lines Whisper tends to invent for silence or noise (trained on subtitled videos). A transcript that is nothing
+    /// but one of these is treated as "nothing said".
+    static let hallucinations: Set<String> = [
+        "thanks for watching", "thank you for watching", "thanks for listening", "thank you for listening",
+        "please subscribe", "like and subscribe", "don't forget to subscribe", "see you in the next video",
+        "see you next time", "subtitles by the amara org community", "subtitles by amara org", "transcribed by",
+        "the end", "you", "bye", "music", "silence", "blank audio", "inaudible", "foreign",
+    ]
+
+    static func isHallucination(_ text: String) -> Bool {
+        let key = text.lowercased().unicodeScalars
+            .map { CharacterSet.alphanumerics.contains($0) || $0 == " " ? Character($0) : Character(" ") }
+            .reduce(into: "") { $0.append($1) }
+            .split(separator: " ").joined(separator: " ")
+        return key.isEmpty || hallucinations.contains(key)
+    }
+
+    /// Spacing for pasting at a caret: a space before when the text would otherwise glue onto a word or punctuation,
+    /// and a space after when it would run into a following word.
+    static func fit(_ text: String, before: String, after: String) -> String {
+        guard !text.isEmpty else { return text }
+        var out = text
+        if let last = before.last, !last.isWhitespace, !last.isNewline, !"([{\"'“‘/-–—".contains(last) {
+            out = " " + out
+        }
+        if let next = after.first, next.isLetter || next.isNumber {
+            out += " "
+        }
+        return out
+    }
+
     /// Whisper-style annotations such as `[BLANK_AUDIO]`, `(laughs)`, `*music*`, `♪`.
     static func removeNonSpeechTags(_ text: String) -> String {
         var out = text.replacingOccurrences(of: #"\[[^\]\n]{0,40}\]"#, with: " ", options: .regularExpression)
