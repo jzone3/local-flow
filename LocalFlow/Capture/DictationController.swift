@@ -188,6 +188,7 @@ final class DictationController: ObservableObject {
             text = text.replacingOccurrences(of: pattern, with: "", options: [.regularExpression])
         }
         text = text.replacingOccurrences(of: "\\s*:\\s*\\)", with: ")", options: .regularExpression)
+        text = text.replacingOccurrences(of: "\\.\\s*\\)", with: ")", options: .regularExpression)
         text = text.replacingOccurrences(of: "\\(\\s*\\)", with: "", options: .regularExpression)
         text = text.replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
         text = text.trimmingCharacters(in: CharacterSet(charactersIn: " :-\n\t"))
