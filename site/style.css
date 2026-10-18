@@ -1,11 +1,11 @@
 :root {
   color-scheme: light dark;
   --fg: #111; --bg: #fff; --muted: #6b6b6b; --line: #e6e6e6;
-  --key-line: #cfcfcf;
+  --key-line: #cfcfcf; --pill: #f1f1f1; --pill-hover: #e6e6e6;
   --k: clamp(30px, 8vw, 46px);
 }
 @media (prefers-color-scheme: dark) {
-  :root { --fg: #f2f2f2; --bg: #0b0b0b; --muted: #9a9a9a; --line: #222; --key-line: #333; }
+  :root { --fg: #f2f2f2; --bg: #0b0b0b; --muted: #9a9a9a; --line: #222; --key-line: #333; --pill: #1a1a1a; --pill-hover: #262626; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -16,6 +16,15 @@ body {
 }
 a { color: var(--fg); }
 main { max-width: 760px; margin: 0 auto; padding: 44px 24px 0; }
+
+.corner { position: fixed; top: 16px; z-index: 10; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap; background: var(--pill); color: var(--fg); opacity: 0.45; transition: opacity 0.35s ease, background 0.2s ease; }
+.corner:hover, .corner:focus-visible { opacity: 1; background: var(--pill-hover); }
+.corner.left { left: 20px; }
+.corner svg { flex: none; }
+.corner.right { right: 20px; opacity: 0; }
+.corner.right.show { opacity: 0.45; }
+.corner.right:hover, .corner.right:focus-visible { opacity: 1; }
+@media (hover: none) { .corner.right { opacity: 0.45; } }
 
 .hero { text-align: center; }
 .mark { width: 64px; height: 64px; margin: 0 auto 14px; display: block; border-radius: 15px; }
@@ -108,7 +117,7 @@ footer { border-top: 1px solid var(--line); padding: 24px; color: var(--muted); 
 footer p { margin: 0; }
 
 @media (max-width: 640px) {
-  main { padding: 36px 20px 0; }
+  main { padding: 64px 20px 0; }
   .mark { width: 72px; height: 72px; border-radius: 16px; }
   h1 { font-size: 36px; }
   .lede { font-size: 18px; }
@@ -122,7 +131,7 @@ footer p { margin: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .key, .bar, .dot { transition: none; }
+  .key, .bar, .dot, .corner { transition: none; }
   .wave i { animation: none; }
   .wave i:nth-child(odd) { height: 12px; } .wave i:nth-child(3n) { height: 18px; } .wave i:nth-child(4n) { height: 8px; }
 }
