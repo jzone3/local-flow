@@ -40,6 +40,7 @@ struct GeneralSettings: View {
             .onAppear { fnConflict = Hotkey.systemDictationUsesFnTwice }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 fnConflict = Hotkey.systemDictationUsesFnTwice
+                controller.refreshPermissions()   // the user usually comes back from System Settings
             }
             Section("Microphone") {
                 MicrophonePicker()
