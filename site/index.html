@@ -14,6 +14,8 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<a class="corner left" href="https://devin.ai">Built by Devin</a>
+<a class="corner right" id="follow" href="https://x.com/imjaredz">Follow me</a>
 <main>
   <header class="hero">
     <img class="mark" src="icon.png" alt="" width="88" height="88">
@@ -67,6 +69,17 @@
 </footer>
 
 <script>
+(function () {
+  var follow = document.getElementById('follow');
+  if (follow && window.matchMedia('(hover: hover)').matches) {
+    var timer;
+    document.addEventListener('mousemove', function () {
+      follow.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(function () { follow.classList.remove('show'); }, 1000);
+    });
+  }
+})();
 (function () {
   var stage = document.getElementById('stage');
   if (!stage) return;
