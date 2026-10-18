@@ -74,7 +74,7 @@ private struct WelcomeView: View {
             .controlSize(.large)
         }
         .padding(.horizontal, 36)
-        .padding(.top, 30)
+        .padding(.top, 22)  // the icon artwork has its own margin; this reads as even with the 28 below
         .padding(.bottom, 28)
         .frame(width: 400)
         .overlay(alignment: .topLeading) {
