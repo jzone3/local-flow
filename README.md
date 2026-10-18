@@ -2,7 +2,7 @@
 
 [![Built by Devin](https://raw.githubusercontent.com/club-cog/built-by-devin/main/badges/built-by-devin.svg)](https://devin.ai)
 
-Open-source, privacy-first dictation for the Mac. Hold a key, talk, let go — your words are typed wherever your cursor is.
+You speak faster than you type. Local Flow keeps all voice dictation private. Nobody will train on your data and all transcription runs locally.
 
 [uselocalflow.app](https://www.uselocalflow.app)
 
