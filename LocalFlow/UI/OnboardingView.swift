@@ -132,22 +132,28 @@ struct OnboardingView: View {
         VStack(spacing: 26) {
             header("Two permissions", "macOS asks for these so Local Flow can hear you and type for you.", icon: "hand")
             VStack(spacing: 0) {
-                permissionRow("mic", "Microphone", granted: AudioRecorder.hasPermission, detail: "To record while you hold the key.") {
-                    Task { _ = await AudioRecorder.requestPermission(); controller.refreshPermissions() }
+                permissionRow("mic", "Microphone", granted: controller.hasMicrophone, detail: "To record while you hold the key.") {
+                    if AudioRecorder.isDenied {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
+                    } else {
+                        Task { _ = await AudioRecorder.requestPermission(); controller.refreshPermissions() }
+                    }
                 }
                 rowDivider
-                permissionRow("accessibility", "Accessibility", granted: HotkeyMonitor.hasAccessibility, detail: "To notice the hotkey in any app and paste the text.") {
+                permissionRow("accessibility", "Accessibility", granted: controller.hasAccessibility, detail: "To notice the hotkey in any app and paste the text.") {
                     HotkeyMonitor.requestAccessibility()
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                 }
             }
             .card()
-            .id(controller.permissionProblem)
             Button("Re-check") { controller.refreshPermissions() }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .font(.callout)
         }
+        .onAppear { controller.refreshPermissions() }
+        // Grants happen in System Settings, so poll while this step is showing; the rows flip to a check on their own.
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in controller.refreshPermissions() }
     }
 
     private func permissionRow(_ icon: String, _ name: String, granted: Bool, detail: String, action: @escaping () -> Void) -> some View {

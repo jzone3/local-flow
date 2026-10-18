@@ -16,6 +16,7 @@ enum Welcome {
 
         let host = NSHostingController(rootView: WelcomeView().windowMaterial())
         host.sizingOptions = [.preferredContentSize]
+        host.safeAreaRegions = []  // hidden title bar: no safe-area inset, so the content is padded evenly
         let sheet = NSWindow(contentViewController: host)
         sheet.setContentSize(host.view.fittingSize)
         sheet.styleMask = [.titled, .fullSizeContentView]
@@ -52,12 +53,16 @@ private struct WelcomeView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 12)
-            Text("I built this with Devin, Cognition's AI software engineer. The whole thing is open source.")
+            Text("You speak faster than you type. Local Flow keeps all voice dictation private. Nobody will train on your data, and all transcription runs locally.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 10)
+            Text("Built with Devin by Cognition. Open source.")
+                .font(.system(size: 12))
+                .foregroundStyle(.tertiary)
                 .padding(.bottom, 28)
             HStack(spacing: 12) {
                 Button("Source Code") { NSWorkspace.shared.open(Welcome.repoURL) }
@@ -77,7 +82,6 @@ private struct WelcomeView: View {
                 .padding(.leading, 16)
                 .padding(.top, 14)
         }
-        .ignoresSafeArea(.container, edges: .top)
     }
 
 }

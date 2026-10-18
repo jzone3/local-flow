@@ -32,6 +32,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.jzone3.LocalFlow
         PRODUCT_NAME: Local Flow
         INFOPLIST_FILE: LocalFlow/Resources/Info.plist
+        # Hardened-runtime (release) builds get no microphone prompt at all without this entitlement.
+        CODE_SIGN_ENTITLEMENTS: LocalFlow/LocalFlow.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_APP_SANDBOX: NO
         GENERATE_INFOPLIST_FILE: NO

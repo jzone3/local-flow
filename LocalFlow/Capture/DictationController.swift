@@ -21,6 +21,8 @@ final class DictationController: ObservableObject {
     @Published private(set) var state: State = .idle
     @Published private(set) var lastWarning: String?
     @Published private(set) var permissionProblem: String?
+    @Published private(set) var hasMicrophone = AudioRecorder.hasPermission
+    @Published private(set) var hasAccessibility = HotkeyMonitor.hasAccessibility
     @Published private(set) var handsFree = false
 
     let recorder = AudioRecorder()
@@ -58,6 +60,8 @@ final class DictationController: ObservableObject {
     }
 
     func refreshPermissions() {
+        hasMicrophone = AudioRecorder.hasPermission
+        hasAccessibility = HotkeyMonitor.hasAccessibility
         if !HotkeyMonitor.hasAccessibility {
             permissionProblem = "Local Flow needs Accessibility access to see the hotkey and paste into other apps."
         } else if !AudioRecorder.hasPermission {

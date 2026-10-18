@@ -34,6 +34,12 @@ final class AudioRecorder: ObservableObject {
 
     static var hasPermission: Bool { AVCaptureDevice.authorizationStatus(for: .audio) == .authorized }
 
+    /// True once the user has answered the system prompt with "Don't Allow"; only System Settings can change it then.
+    static var isDenied: Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        return status == .denied || status == .restricted
+    }
+
     func start() throws {
         guard !isRecording else { return }
         resumeMonitoring = monitoring
