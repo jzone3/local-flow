@@ -1,4 +1,3 @@
-import Carbon.HIToolbox
 import SwiftUI
 
 @main
@@ -103,12 +102,6 @@ final class WindowManager {
         windows[key] = window
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
-        }
-        // A focused API-key field holds Secure Event Input even after the user switches apps, and the
-        // next dictation's ⌘V would land in it instead of the frontmost app. Drop focus when the window
-        // stops being key.
-        NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak window] _ in
-            if IsSecureEventInputEnabled() { window?.makeFirstResponder(nil) }
         }
         return window
     }
