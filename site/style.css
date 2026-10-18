@@ -17,9 +17,10 @@ body {
 a { color: var(--fg); }
 main { max-width: 760px; margin: 0 auto; padding: 44px 24px 0; }
 
-.corner { position: fixed; top: 16px; z-index: 10; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 32px; border-radius: 999px; background: var(--pill); color: var(--fg); opacity: 0.45; transition: opacity 0.35s ease, background 0.2s ease; }
+.corner { position: fixed; top: 16px; z-index: 10; display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap; background: var(--pill); color: var(--fg); opacity: 0.45; transition: opacity 0.35s ease, background 0.2s ease; }
 .corner:hover, .corner:focus-visible { opacity: 1; background: var(--pill-hover); }
 .corner.left { left: 20px; }
+.corner svg { flex: none; }
 .corner.right { right: 20px; opacity: 0; }
 .corner.right.show { opacity: 0.45; }
 .corner.right:hover, .corner.right:focus-visible { opacity: 1; }
