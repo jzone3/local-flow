@@ -192,7 +192,10 @@ final class LocalWhisper: TranscriptionProvider {
         params.print_realtime = false
         params.print_timestamps = false
         params.print_special = false
-        params.no_timestamps = true
+        // Timestamps stay on even though we never show them: without them whisper.cpp treats every 30 s window as
+        // finished the moment the decoder stops, so one early stop or echoed prompt silently drops the rest of
+        // the window. With them it only advances to the last timestamp and retries a window that produced nothing.
+        params.no_timestamps = false
         params.single_segment = false
         params.suppress_blank = true
         params.suppress_nst = true
@@ -209,6 +212,10 @@ final class LocalWhisper: TranscriptionProvider {
                 params.language = langPtr
                 params.detect_language = false
                 params.initial_prompt = hint.isEmpty ? nil : hintPtr
+                // Every window is conditioned on the dictionary hint alone. Carrying decoded text forward lets one
+                // bad window (silence heard as "Thank you.") poison the rest of a long dictation.
+                params.carry_initial_prompt = true
+                params.n_max_text_ctx = hint.isEmpty ? 0 : whisper_token_count(ctx, hintPtr) + 1
                 return samples.withUnsafeBufferPointer { buffer in
                     whisper_full(ctx, params, buffer.baseAddress, Int32(buffer.count))
                 }
@@ -218,7 +225,9 @@ final class LocalWhisper: TranscriptionProvider {
 
         var text = ""
         for i in 0..<whisper_full_n_segments(ctx) {
-            if let segment = whisper_full_get_segment_text(ctx, i) { text += String(cString: segment) }
+            guard let segment = whisper_full_get_segment_text(ctx, i) else { continue }
+            let piece = String(cString: segment)
+            if !Vocabulary.isPromptEcho(piece) { text += piece }
         }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
