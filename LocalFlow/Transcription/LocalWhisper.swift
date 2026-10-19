@@ -17,14 +17,14 @@ struct WhisperModel: Identifiable, Equatable {
     static let all: [WhisperModel] = [
         WhisperModel(id: "large-v3-turbo", title: "Best", file: "large-v3-turbo", detail: "Most accurate. Still instant on Apple silicon.", bytes: 1_624_555_275),
         WhisperModel(id: "large-v3-turbo-q5_0", title: "Classic", file: "large-v3-turbo-q5_0", detail: "Same model, a third of the size. Nearly as accurate.", bytes: 574_041_195),
-        WhisperModel(id: "base", title: "Tiny", file: "base", detail: "Small and fast. Fine for short notes and older Macs.", bytes: 147_951_465),
+        WhisperModel(id: "small", title: "Tiny", file: "small", detail: "Small and fast. Fine for short notes and older Macs.", bytes: 487_601_967),
     ]
 
     static let recommended = all[0]
 
     /// Older builds stored other model IDs; those map to the nearest tier.
     static func named(_ id: String) -> WhisperModel {
-        all.first { $0.id == id } ?? (["large-v3", "medium.en", "medium"].contains(id) ? recommended : id.hasPrefix("small") ? all[1] : id.hasPrefix("base") ? all[2] : recommended)
+        all.first { $0.id == id } ?? (["large-v3", "medium.en", "medium"].contains(id) ? recommended : id.hasPrefix("small") || id.hasPrefix("base") ? all[2] : recommended)
     }
 
     static var directory: URL {
@@ -35,6 +35,11 @@ struct WhisperModel: Identifiable, Equatable {
 
     var localURL: URL { WhisperModel.directory.appendingPathComponent(fileName) }
     var isDownloaded: Bool { FileManager.default.fileExists(atPath: localURL.path) }
+
+    /// The Tiny tier used to be ggml-base; nothing loads that file any more.
+    static func removeRetiredFiles() {
+        try? FileManager.default.removeItem(at: directory.appendingPathComponent("ggml-base.bin"))
+    }
 }
 
 /// Downloads a model file with progress, writing to a temp file so a half download never looks installed.
@@ -199,7 +204,9 @@ final class LocalWhisper: TranscriptionProvider {
         params.single_segment = false
         params.suppress_blank = true
         params.suppress_nst = true
-        params.temperature_inc = 0.2
+        // whisper.cpp's temperature fallback samples, so the same audio can come back with different words. Tiny
+        // (ggml-small) never needs it; the bigger models keep it as a safety net.
+        params.temperature_inc = model == WhisperModel.all[2] ? 0 : 0.2
         params.no_speech_thold = 0.6
         params.translate = false
 
