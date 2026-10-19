@@ -16,6 +16,8 @@ final class HotkeyMonitor {
     private(set) var isDown = false
     /// Set while dictating hands-free so Esc still cancels although the key is up.
     var escapeArmed = false
+    /// Set while the Settings recorder is capturing keys so holding the current hotkey doesn't start a dictation.
+    var isPaused = false
     private var hotkey: Hotkey
 
     init(hotkey: Hotkey) {
@@ -61,6 +63,7 @@ final class HotkeyMonitor {
     /// Returns true when the event belonged to the hotkey and should not reach the app.
     @discardableResult
     private func handle(_ event: NSEvent) -> Bool {
+        if isPaused { return false }
         if isDown || escapeArmed, event.type == .keyDown, event.keyCode == 53 {  // Esc cancels
             isDown = false
             escapeArmed = false

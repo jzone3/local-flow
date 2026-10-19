@@ -60,6 +60,11 @@ final class DictationController: ObservableObject {
         refreshPermissions()
     }
 
+    var hotkeyPaused: Bool {
+        get { hotkey.isPaused }
+        set { hotkey.isPaused = newValue }
+    }
+
     func refreshPermissions() {
         hasMicrophone = AudioRecorder.hasPermission
         hasAccessibility = HotkeyMonitor.hasAccessibility

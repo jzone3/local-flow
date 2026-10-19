@@ -421,6 +421,7 @@ struct HotkeyRecorder: View {
         recording = true
         held = 0
         hint = nil
+        DictationController.shared.hotkeyPaused = true
         var state = HotkeyRecording()
         var swallowUp: UInt16?  // the committed key's key-up, so e.g. ⌘Space doesn't still open Spotlight
         let handle: (NSEvent) -> Bool = { event in
@@ -456,6 +457,7 @@ struct HotkeyRecorder: View {
     private func stop() {
         recording = false
         held = 0
+        DictationController.shared.hotkeyPaused = false
         tap?.stop()
         tap = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
