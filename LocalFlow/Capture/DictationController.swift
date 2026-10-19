@@ -142,6 +142,7 @@ final class DictationController: ObservableObject {
         }
         transcribingText = TranscriptionService.transcribingLabel()
         state = .transcribing
+        hotkey.escapeArmed = true  // Esc still cancels while the cloud round trip runs
         let entryID = UUID()
         let audioURL = HistoryStore.shared.newAudioURL(id: entryID)
         let wav = AudioRecorder.wavData(from: samples)
@@ -149,6 +150,7 @@ final class DictationController: ObservableObject {
 
         transcription = Task { [weak self] in
             guard let self else { return }
+            defer { hotkey.escapeArmed = false }
             do {
                 let outcome = try await TranscriptionService().transcribe(samples: samples)
                 guard !Task.isCancelled else { return }
