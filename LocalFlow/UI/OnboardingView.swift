@@ -58,6 +58,7 @@ struct OnboardingView: View {
                     Button(step == 3 && settings.engineMode == .local ? "Skip" : "Continue") { step += 1 }
                         .actionButton(prominent: true)
                         .keyboardShortcut(.defaultAction)
+                        .disabled(step == 1 && !hasPermissions)
                 } else {
                     Button("Start Dictating") {
                         settings.onboardingDone = true
@@ -129,6 +130,8 @@ struct OnboardingView: View {
         }
     }
 
+    private var hasPermissions: Bool { controller.hasMicrophone && controller.hasAccessibility }
+
     private var permissions: some View {
         VStack(spacing: 26) {
             header("Two permissions", "macOS asks for these so Local Flow can hear you and type for you.", icon: "hand")
@@ -147,10 +150,15 @@ struct OnboardingView: View {
                 }
             }
             .card()
-            Button("Re-check") { controller.refreshPermissions() }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .font(.callout)
+            VStack(spacing: 8) {
+                if !hasPermissions {
+                    Text("Both are needed to dictate.").font(.callout).foregroundStyle(.secondary)
+                }
+                Button("Re-check") { controller.refreshPermissions() }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .font(.callout)
+            }
         }
         .onAppear { controller.refreshPermissions() }
         // Grants happen in System Settings, so poll while this step is showing; the rows flip to a check on their own.

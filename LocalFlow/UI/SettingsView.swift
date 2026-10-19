@@ -363,6 +363,8 @@ struct PrivacySettings: View {
                 Toggle("Clean up transcripts", isOn: $settings.cleanupEnabled)
                 Text("Removes ums and uhs, fixes capitalisation and punctuation, and turns \"new paragraph\" into a line break. This is done with rules on this Mac; your text is never sent anywhere for cleanup. Turn it off to keep transcripts exactly as the model heard them.")
                     .font(.caption).foregroundStyle(.secondary)
+                Text("Adapts to the app in front: terminals and editors get it as spoken, chats skip the final period.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("History") {
                 Text("Transcripts and recordings are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way.")
