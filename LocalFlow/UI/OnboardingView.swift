@@ -253,7 +253,7 @@ struct OnboardingView: View {
                 Button("Use") { use(found) }.actionButton().controlSize(.small)
             }
         }
-        .id(keyChanged)
+        .id("\(provider.rawValue)-\(keyChanged)")
     }
 
     private func provider(for found: EnvironmentKeys.Found) -> CloudProviderID? {
