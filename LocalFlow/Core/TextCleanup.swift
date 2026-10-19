@@ -11,16 +11,51 @@ enum TextCleanup {
 
     static let fillerWords: Set<String> = ["um", "umm", "ummm", "uh", "uhh", "uhm", "er", "erm", "ah", "ahh", "hmm", "hm", "mm", "mhm", "mmm"]
 
-    static func clean(_ raw: String, options: Options = .all) -> String {
+    /// `vocabulary` only matters for `.code`: a first word the dictionary spells with a capital keeps it.
+    static func clean(_ raw: String, profile: CleanupProfile = .standard, vocabulary: Vocabulary? = nil, options: Options = .all) -> String {
         var text = raw
         text = removeNonSpeechTags(text)
         if options.removeFillers { text = removeFillers(text) }
         if options.collapseStutters { text = collapseStutters(text) }
         if options.voiceCommands { text = applyVoiceCommands(text) }
-        text = fixPunctuationSpacing(text)
-        text = normalizeWhitespace(text)
-        text = capitalizeSentences(text)
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch profile {
+        case .code:
+            text = joinSpokenDomains(text)
+            text = normalizeWhitespace(text).trimmingCharacters(in: .whitespacesAndNewlines)
+            text = dropTrailingPeriod(text)
+            return lowercaseFirstWord(text, unlessIn: vocabulary)
+        case .casual:
+            text = fixPunctuationSpacing(text)
+            text = normalizeWhitespace(text)
+            text = capitalizeSentences(text)
+            return dropTrailingPeriod(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        case .standard:
+            text = fixPunctuationSpacing(text)
+            text = normalizeWhitespace(text)
+            text = capitalizeSentences(text)
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    /// One final period the model added; "?" and "!" and "..." stay.
+    static func dropTrailingPeriod(_ text: String) -> String {
+        guard text.hasSuffix("."), !text.hasSuffix("..") else { return text }
+        return String(text.dropLast())
+    }
+
+    /// "example dot com" → "example.com"; only before a known top-level domain so "a dot product" is left alone.
+    static func joinSpokenDomains(_ text: String) -> String {
+        let tlds = "com|net|org|io|dev|app|ai|co|edu|gov|me|us|uk|de|fr|ca|info|xyz|sh|tv"
+        return text.replacingOccurrences(of: #"(?i)(?<=[a-z0-9])\s+dot\s+(?=(?:"# + tlds + #")\b)"#, with: ".", options: .regularExpression)
+    }
+
+    /// Whisper capitalises the first word of everything; code wants it as typed unless the dictionary says otherwise.
+    static func lowercaseFirstWord(_ text: String, unlessIn vocabulary: Vocabulary?) -> String {
+        guard let first = text.first, first.isUppercase else { return text }
+        let word = text.prefix { $0.isLetter || $0.isNumber }
+        let known = vocabulary?.terms.contains { $0 == word || $0.hasPrefix(word + " ") } ?? false
+        guard !known else { return text }
+        return first.lowercased() + text.dropFirst()
     }
 
     /// Lines Whisper tends to invent for silence or noise (trained on subtitled videos). A transcript that is nothing

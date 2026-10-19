@@ -33,6 +33,21 @@ enum TextInserter {
         }
     }
 
+    /// Role and description (or title) of the focused element, for picking a cleanup profile. Nil without Accessibility.
+    static func focusedElement() -> (role: String?, description: String?)? {
+        var focusedRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
+              let focusedRef, CFGetTypeID(focusedRef) == AXUIElementGetTypeID() else { return nil }
+        let element = unsafeBitCast(focusedRef, to: AXUIElement.self)
+        func string(_ attribute: String) -> String? {
+            var ref: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(element, attribute as CFString, &ref) == .success else { return nil }
+            return ref as? String
+        }
+        let description = [string(kAXDescriptionAttribute), string(kAXTitleAttribute)].compactMap { $0 }.first { !$0.isEmpty }
+        return (string(kAXRoleAttribute), description)
+    }
+
     /// The characters just before and after the caret in the focused text field, via Accessibility. Nil when the
     /// focused element doesn't expose its text (Terminal, secure fields, some web views) — then nothing is adjusted.
     static func cursorContext() -> (before: String, after: String)? {

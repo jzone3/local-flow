@@ -22,7 +22,7 @@ final class TranscriptionService {
         self.local = local
     }
 
-    func transcribe(samples: [Float]) async throws -> Outcome {
+    func transcribe(samples: [Float], profile: CleanupProfile = .standard) async throws -> Outcome {
         let vocabulary = settings.vocabulary
         let request = TranscriptionRequest(samples: samples, wav: AudioRecorder.wavData(from: samples),
                                            vocabulary: vocabulary, language: settings.language)
@@ -66,7 +66,7 @@ final class TranscriptionService {
             }
         }
 
-        return Outcome(text: Self.postProcess(result.text, vocabulary: vocabulary, cleanup: settings.cleanupEnabled),
+        return Outcome(text: Self.postProcess(result.text, vocabulary: vocabulary, cleanup: settings.cleanupEnabled, profile: profile),
                        rawText: result.text, engine: result.engine, warning: warning)
     }
 
@@ -144,10 +144,10 @@ final class TranscriptionService {
         }
     }
 
-    static func postProcess(_ raw: String, vocabulary: Vocabulary, cleanup: Bool) -> String {
+    static func postProcess(_ raw: String, vocabulary: Vocabulary, cleanup: Bool, profile: CleanupProfile = .standard) -> String {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         text = vocabulary.applySpelling(to: text)
-        if cleanup { text = TextCleanup.clean(text) }
+        if cleanup { text = TextCleanup.clean(text, profile: profile, vocabulary: vocabulary) }
         else { text = TextCleanup.normalizeWhitespace(TextCleanup.removeNonSpeechTags(text)).trimmingCharacters(in: .whitespacesAndNewlines) }
         return text
     }

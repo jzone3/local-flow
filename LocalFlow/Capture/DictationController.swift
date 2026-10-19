@@ -34,6 +34,7 @@ final class DictationController: ObservableObject {
     private var hideWork: DispatchWorkItem?
     private var cancellables: Set<AnyCancellable> = []
     private var startedAt: Date?
+    private var profile: CleanupProfile = .standard
     private var pressedAt: Date?
     private var lastTapAt: Date?
     private var ignoreNextRelease = false
@@ -121,6 +122,7 @@ final class DictationController: ObservableObject {
         do {
             try recorder.start()
             startedAt = Date()
+            profile = Self.targetProfile()
             state = .listening
             if settings.playSounds { NSSound(named: "Tink")?.play() }
             bar.show()
@@ -157,7 +159,7 @@ final class DictationController: ObservableObject {
             guard let self else { return }
             defer { hotkey.escapeArmed = false }
             do {
-                let outcome = try await TranscriptionService().transcribe(samples: samples)
+                let outcome = try await TranscriptionService().transcribe(samples: samples, profile: profile)
                 guard !Task.isCancelled else { return }
                 lastWarning = outcome.warning.map(Self.friendly)
                 if TextCleanup.isHallucination(outcome.text) {
@@ -182,6 +184,13 @@ final class DictationController: ObservableObject {
                 show(failure: error.localizedDescription)
             }
         }
+    }
+
+    /// The app the text will land in is the one in front: Local Flow is an accessory app and never takes that spot.
+    private static func targetProfile() -> CleanupProfile {
+        let focused = HotkeyMonitor.hasAccessibility ? TextInserter.focusedElement() : nil
+        return CleanupProfile.for(bundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                                  focusedRole: focused?.role, focusedDescription: focused?.description)
     }
 
     func cancel() {
