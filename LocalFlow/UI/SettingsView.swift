@@ -365,13 +365,13 @@ struct AboutSettings: View {
                 Button(checker.isChecking ? "Checking…" : "Check for Updates") { checker.check(userInitiated: true) }
                     .disabled(checker.isChecking)
                     .actionButton(prominent: true)
-                Button("Source Code") { NSWorkspace.shared.open(Welcome.repoURL) }
+                Button("Source Code") { Welcome.openInBackground(Welcome.repoURL) }
                     .actionButton()
-                Button("@imjaredz") { NSWorkspace.shared.open(Welcome.authorURL) }
+                Button("@imjaredz") { Welcome.openInBackground(Welcome.authorURL) }
                     .actionButton()
             }
             .padding(.top, 8)
-            Button("Built with Devin") { NSWorkspace.shared.open(Welcome.devinURL) }
+            Button("Built with Devin") { Welcome.openInBackground(Welcome.devinURL) }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .font(.callout)

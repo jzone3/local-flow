@@ -27,17 +27,33 @@ enum Welcome {
         sheet.center()
         NSApp.runModal(for: sheet)
         sheet.orderOut(nil)
-        openInBackground(authorURL)
         next()
+        openInBackground(authorURL)
     }
 
     static func dismiss() { NSApp.stopModal() }
 
-    /// Opens the URL without bringing the browser in front of the app.
+    /// Opens the URL behind the app. A browser that has to launch first comes to the front anyway
+    /// (`activates = false` only covers a running one), so the app takes the front back when that happens.
     static func openInBackground(_ url: URL) {
         let config = NSWorkspace.OpenConfiguration()
         config.activates = false
+        let center = NSWorkspace.shared.notificationCenter
+        var token: NSObjectProtocol?
+        token = center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app != .current else { return }
+            comeBackToFront()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { token.map(center.removeObserver) }
         NSWorkspace.shared.open(url, configuration: config)
+    }
+
+    @MainActor
+    private static func comeBackToFront() {
+        guard let window = NSApp.keyWindow ?? NSApp.windows.last(where: { $0.isVisible && $0.canBecomeKey }) else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
     }
 }
 
@@ -65,7 +81,7 @@ private struct WelcomeView: View {
                 .foregroundStyle(.tertiary)
                 .padding(.bottom, 28)
             HStack(spacing: 12) {
-                Button("Source Code") { NSWorkspace.shared.open(Welcome.repoURL) }
+                Button("Source Code") { Welcome.openInBackground(Welcome.repoURL) }
                     .actionButton()
                 Button("Get Started") { Welcome.dismiss() }
                     .actionButton(prominent: true)
@@ -92,7 +108,7 @@ private struct TryDevinLink: View {
 
     var body: some View {
         Button {
-            NSWorkspace.shared.open(Welcome.devinURL)
+            Welcome.openInBackground(Welcome.devinURL)
         } label: {
             Text("Try Devin \u{2197}")
                 .font(.system(size: 11.5, weight: .medium))
