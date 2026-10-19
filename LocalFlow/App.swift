@@ -97,6 +97,7 @@ final class WindowManager {
             ? AnyView(content().windowMaterial())
             : AnyView(content().frame(minWidth: size.width, minHeight: size.height).windowMaterial())
         window.contentViewController = NSHostingController(rootView: root)
+        window.setContentSize(size)
         window.center()
         window.makeKeyAndOrderFront(nil)
         windows[key] = window
