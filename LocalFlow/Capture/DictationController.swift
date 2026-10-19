@@ -20,6 +20,7 @@ final class DictationController: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var lastWarning: String?
+    @Published private(set) var transcribingText = "Transcribing…"
     @Published private(set) var permissionProblem: String?
     @Published private(set) var hasMicrophone = AudioRecorder.hasPermission
     @Published private(set) var hasAccessibility = HotkeyMonitor.hasAccessibility
@@ -44,7 +45,7 @@ final class DictationController: ObservableObject {
         switch state {
         case .idle: return "Hold or double-tap \(settings.hotkey.displayName) to dictate"
         case .listening: return "Listening…"
-        case .transcribing: return "Transcribing…"
+        case .transcribing: return transcribingText
         case .done: return "Pasted"
         case .failed(let message): return message
         }
@@ -139,7 +140,9 @@ final class DictationController: ObservableObject {
             }
             return
         }
+        transcribingText = TranscriptionService.transcribingLabel()
         state = .transcribing
+        hotkey.escapeArmed = true  // Esc still cancels while the cloud round trip runs
         let entryID = UUID()
         let audioURL = HistoryStore.shared.newAudioURL(id: entryID)
         let wav = AudioRecorder.wavData(from: samples)
@@ -147,6 +150,7 @@ final class DictationController: ObservableObject {
 
         transcription = Task { [weak self] in
             guard let self else { return }
+            defer { hotkey.escapeArmed = false }
             do {
                 let outcome = try await TranscriptionService().transcribe(samples: samples)
                 guard !Task.isCancelled else { return }

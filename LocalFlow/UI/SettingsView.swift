@@ -111,8 +111,6 @@ struct TranscriptionSettings: View {
 
 struct CloudSettings: View {
     @ObservedObject private var settings = AppSettings.shared
-    @State private var key = ""
-    @State private var saved = false
     @State private var keyChanged = 0  // bumps so the "Key stored" line re-reads the Keychain
 
     private var provider: CloudProviderID { settings.cloudProvider }
@@ -126,22 +124,12 @@ struct CloudSettings: View {
                                                set: { settings.setCloudModel($0, for: provider) })) {
                 ForEach(provider.models, id: \.id) { Text($0.title).tag($0.id) }
             }
-            HStack {
-                SecureField("API key", text: $key)
-                    .textFieldStyle(.roundedBorder)
-                Button(saved ? "Saved" : "Save") {
-                    Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: provider.keychainAccount)
-                    saved = true
-                    keyChanged += 1
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { saved = false }
-                }
-                .disabled(key.isEmpty)
-                .actionButton(prominent: true)
-            }
+            ProviderKeyField(provider: provider) { keyChanged += 1 }
+                .id(provider.rawValue)
             HStack {
                 if provider.apiKey != nil {
                     Label { Text("Key stored in your Keychain") } icon: { Icon("check-circle", size: 14) }.foregroundStyle(.green)
-                    Button("Remove") { Keychain.delete(provider.keychainAccount); key = ""; keyChanged += 1 }
+                    Button("Remove") { Keychain.delete(provider.keychainAccount); keyChanged += 1 }
                         .actionButton().controlSize(.small)
                 } else {
                     Label { Text("No key saved") } icon: { Icon("key", size: 14) }.foregroundStyle(.secondary)
@@ -153,7 +141,53 @@ struct CloudSettings: View {
             EnvironmentKeyPicker(provider: provider) { keyChanged += 1 }
                 .id("\(provider.rawValue)-\(keyChanged)")
         }
-        .onChange(of: settings.cloudProviderID) { _, _ in key = "" }
+        Section {
+            MixtureOfExpertsToggle()
+                .id(keyChanged)
+        }
+    }
+}
+
+/// "Mixture of experts" toggle with its explanation; the captions re-read the Keychain whenever the parent re-creates it.
+struct MixtureOfExpertsToggle: View {
+    @ObservedObject private var settings = AppSettings.shared
+
+    var body: some View {
+        Toggle(MixtureOfExperts.title, isOn: $settings.mixtureOfExperts)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(MixtureOfExperts.explanation)
+            if settings.cloudProvidersWithKeys.count < 2 {
+                Text(MixtureOfExperts.needMoreKeys)
+            }
+            if CloudProviderID.openAI.apiKey == nil {
+                Text(MixtureOfExperts.needOpenAIKey)
+            }
+        }
+        .font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// SecureField + Save for one provider's key. Shared by Settings and the setup flow.
+struct ProviderKeyField: View {
+    let provider: CloudProviderID
+    var onSaved: () -> Void = {}
+    @State private var key = ""
+    @State private var saved = false
+
+    var body: some View {
+        HStack {
+            SecureField("\(provider.title) API key", text: $key)
+                .textFieldStyle(.roundedBorder)
+            Button(saved ? "Saved" : "Save") {
+                Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: provider.keychainAccount)
+                key = ""
+                saved = true
+                onSaved()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { saved = false }
+            }
+            .disabled(key.isEmpty)
+            .actionButton(prominent: true)
+        }
     }
 }
 

@@ -100,7 +100,7 @@ struct DictationBarView: View {
         case .transcribing:
             HStack(spacing: 12) {
                 ProgressView().controlSize(.small)
-                Text("Transcribing…").font(.system(size: 13, weight: .medium))
+                Text(controller.transcribingText).font(.system(size: 13, weight: .medium))
             }
         case .done:
             HStack(spacing: 10) {

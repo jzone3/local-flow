@@ -137,6 +137,36 @@ struct GeminiTranscriber: TranscriptionProvider {
     }
 }
 
+/// One short chat completion; Mixture of experts uses it to merge the transcripts.
+enum OpenAIChat {
+    /// Newest small GPT model in /v1/models at the time of writing; a merge needs no reasoning, so effort is off.
+    static let mergeModel = "gpt-5.4-mini"
+
+    static func complete(_ prompt: String, model: String = mergeModel, key: String) async throws -> String {
+        var body: [String: Any] = ["model": model, "messages": [["role": "user", "content": prompt]]]
+        if model.hasPrefix("gpt-5") { body["reasoning_effort"] = "none" } else { body["temperature"] = 0 }
+        do {
+            return try await send(body, key: key)
+        } catch TranscriptionError.http(400, _) where body["reasoning_effort"] != nil {
+            body["reasoning_effort"] = nil   // an older gpt-5 snapshot that only knows "minimal"
+            return try await send(body, key: key)
+        }
+    }
+
+    private static func send(_ body: [String: Any], key: String) async throws -> String {
+        var req = URLRequest(url: URL(string: "https://api.openai.com/v1/chat/completions")!)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await HTTP.send(req)
+        guard let choices = try HTTP.json(data)["choices"] as? [[String: Any]],
+              let message = choices.first?["message"] as? [String: Any],
+              let text = message["content"] as? String else { throw TranscriptionError.badResponse("missing content") }
+        return text
+    }
+}
+
 enum Gemini {
     static func generate(body: [String: Any], model: String, key: String) async throws -> String {
         var req = URLRequest(url: URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!)

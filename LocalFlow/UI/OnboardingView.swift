@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// First-run setup: welcome → permissions → how to transcribe → dictionary → done.
+/// First-run setup: welcome → permissions → local model → cloud models (optional) → dictionary → done.
 struct OnboardingView: View {
     static let windowSize = NSSize(width: 540, height: 600)
 
@@ -8,9 +8,10 @@ struct OnboardingView: View {
     @ObservedObject private var controller = DictationController.shared
     @ObservedObject private var downloader = ModelDownloader.shared
     @State private var step = 0
-    @State private var foundKeys: [EnvironmentKeys.Found] = []
+    @State private var foundKeys: [EnvironmentKeys.Found]?  // nil until the user asks to import
+    @State private var keyChanged = 0
 
-    private let stepCount = 5
+    private let stepCount = 6
 
     var body: some View {
         VStack(spacing: 0) {
@@ -18,8 +19,9 @@ struct OnboardingView: View {
                 switch step {
                 case 0: welcome
                 case 1: permissions
-                case 2: transcription
-                case 3: dictionary
+                case 2: localModel
+                case 3: cloudModels
+                case 4: dictionary
                 default: done
                 }
             }
@@ -33,7 +35,6 @@ struct OnboardingView: View {
         .padding(.bottom, 24)
         .frame(width: Self.windowSize.width, height: Self.windowSize.height)
         .animation(.easeInOut(duration: 0.2), value: step)
-        .onAppear { foundKeys = EnvironmentKeys.scan() }
     }
 
     // MARK: Footer
@@ -54,7 +55,7 @@ struct OnboardingView: View {
                 }
                 Spacer()
                 if step < stepCount - 1 {
-                    Button("Continue") { step += 1 }
+                    Button(step == 3 && settings.engineMode == .local ? "Skip" : "Continue") { step += 1 }
                         .actionButton(prominent: true)
                         .keyboardShortcut(.defaultAction)
                 } else {
@@ -166,47 +167,103 @@ struct OnboardingView: View {
         }
     }
 
-    private var transcription: some View {
+    private var localModel: some View {
         VStack(spacing: 18) {
-            header("How should it transcribe?", "You can change this any time in Settings.", icon: "waveform")
-            Picker("", selection: $settings.engineMode) {
-                ForEach(EngineMode.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 300)
-            Text(settings.engineMode == .local
-                 ? "Download a Whisper model. It runs on your GPU and audio never leaves this Mac."
-                 : "Audio goes to the provider you pick, with your own key.")
+            header("Download a local model", "Whisper runs on your GPU and audio never leaves this Mac.", icon: "waveform")
+            Form { ModelList() }
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, -20)
+        }
+    }
+
+    private var cloudModels: some View {
+        VStack(spacing: 18) {
+            header("Set up Frontier cloud models", "Optional", icon: "cloud")
+            Text("Cloud models are more accurate for hard audio. Local Flow never saves your audio or transcripts and has no server or database of its own — audio goes straight from your Mac to the provider you pick. The providers may store what you send and use it for training, under their own terms.")
                 .font(.callout).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             Form {
-                if settings.engineMode == .local {
-                    ModelList()
-                } else {
-                    CloudSettings()
-                    if !foundKeys.isEmpty {
-                        Section("Keys found on this Mac") {
-                            ForEach(foundKeys, id: \.name) { item in
-                                HStack {
-                                    Text("\(item.name) · \(item.source) · \(EnvironmentKeys.masked(item.value))").font(.caption)
-                                    Spacer()
-                                    Button("Use") {
-                                        guard let provider = CloudProviderID.allCases.first(where: { $0.environmentVariables.contains(item.name) }) else { return }
-                                        Keychain.set(item.value, for: provider.keychainAccount)
-                                        settings.cloudProviderID = provider.rawValue
-                                    }
-                                    .actionButton()
-                                    .controlSize(.small)
-                                }
+                Section {
+                    if let foundKeys {
+                        HStack {
+                            Text("Keys found on this Mac").font(.headline)
+                            Spacer()
+                            if foundKeys.filter({ provider(for: $0) != nil }).count > 1 {
+                                Button("Use all") { foundKeys.forEach(use) }.actionButton().controlSize(.small)
                             }
                         }
+                        Text("Local Flow found these in your shell files. Nothing is used until you click Use.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(CloudProviderID.allCases) { provider in
+                            foundKeyRow(provider, found: foundKeys.first { self.provider(for: $0) == provider })
+                        }
+                    } else {
+                        Button("Import API keys from your shell…") { foundKeys = EnvironmentKeys.scan() }
+                            .actionButton()
+                        Text("Looks for OPENAI_API_KEY, ELEVENLABS_API_KEY and GEMINI_API_KEY in your shell files. Nothing is saved until you click Use.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                Section("Or paste a key") {
+                    ForEach(CloudProviderID.allCases) { provider in
+                        ProviderKeyField(provider: provider) { keyChanged += 1 }
+                    }
+                }
+                Section {
+                    Picker("Mode", selection: $settings.engineMode) {
+                        ForEach(EngineMode.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    if settings.engineMode == .cloud {
+                        MixtureOfExpertsToggle()
+                    }
+                }
+                .id(keyChanged)
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
             .padding(.horizontal, -20)
         }
+    }
+
+    private func foundKeyRow(_ provider: CloudProviderID, found: EnvironmentKeys.Found?) -> some View {
+        HStack(spacing: 10) {
+            if provider.apiKey != nil || found != nil {
+                Icon("check-circle", size: 16).foregroundStyle(.green)
+            } else {
+                Icon("x-circle", size: 16).foregroundStyle(.tertiary)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(provider.title)
+                Group {
+                    if provider.apiKey != nil {
+                        Text("Saved in your Keychain")
+                    } else if let found {
+                        Text("Found \(found.name) in \(found.source) (\(EnvironmentKeys.masked(found.value)))")
+                    } else {
+                        Text("Not found")
+                    }
+                }
+                .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if provider.apiKey == nil, let found {
+                Button("Use") { use(found) }.actionButton().controlSize(.small)
+            }
+        }
+        .id("\(provider.rawValue)-\(keyChanged)")
+    }
+
+    private func provider(for found: EnvironmentKeys.Found) -> CloudProviderID? {
+        CloudProviderID.allCases.first { $0.environmentVariables.contains(found.name) }
+    }
+
+    private func use(_ found: EnvironmentKeys.Found) {
+        guard let provider = provider(for: found) else { return }
+        Keychain.set(found.value, for: provider.keychainAccount)
+        keyChanged += 1
     }
 
     private var dictionary: some View {
@@ -249,7 +306,7 @@ struct OnboardingView: View {
                         Text("Listening…")
                     case .transcribing:
                         ProgressView().controlSize(.mini)
-                        Text("Transcribing…")
+                        Text(controller.transcribingText)
                     default:
                         if sawHotkey {
                             Icon("check-circle", size: 13).foregroundStyle(.green)
