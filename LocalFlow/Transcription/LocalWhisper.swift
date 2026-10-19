@@ -230,12 +230,12 @@ final class LocalWhisper: TranscriptionProvider {
         }
         guard status == 0 else { throw TranscriptionError.modelFailed("whisper_full returned \(status)") }
 
-        var text = ""
+        var pieces: [String] = []
         for i in 0..<whisper_full_n_segments(ctx) {
             guard let segment = whisper_full_get_segment_text(ctx, i) else { continue }
             let piece = String(cString: segment)
-            if !Vocabulary.isPromptEcho(piece) { text += piece }
+            if !Vocabulary.isPromptEcho(piece) { pieces.append(piece) }
         }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return TextCleanup.dropTrailingSilenceEcho(pieces).joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

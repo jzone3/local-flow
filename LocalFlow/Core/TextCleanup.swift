@@ -80,11 +80,22 @@ enum TextCleanup {
     ]
 
     static func isHallucination(_ text: String) -> Bool {
-        let key = text.lowercased().unicodeScalars
+        let key = hallucinationKey(text)
+        return key.isEmpty || hallucinations.contains(key)
+    }
+
+    private static func hallucinationKey(_ text: String) -> String {
+        text.lowercased().unicodeScalars
             .map { CharacterSet.alphanumerics.contains($0) || $0 == " " ? Character($0) : Character(" ") }
             .reduce(into: "") { $0.append($1) }
             .split(separator: " ").joined(separator: " ")
-        return key.isEmpty || hallucinations.contains(key)
+    }
+
+    /// Whisper hears trailing silence as a lone "you". Segments that end a transcript with only that word are dropped.
+    static func dropTrailingSilenceEcho(_ segments: [String]) -> [String] {
+        var kept = segments
+        while let last = kept.last, hallucinationKey(last) == "you" || hallucinationKey(last).isEmpty { kept.removeLast() }
+        return kept
     }
 
     /// Spacing for pasting at a caret: a space before when the text would otherwise glue onto a word or punctuation,
