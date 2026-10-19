@@ -66,6 +66,7 @@ final class AppSettings: ObservableObject {
     @Published var cloudModels: [String: String] { didSet { defaults.set(cloudModels, forKey: "cloudModels") } }
     @Published var localModelID: String { didSet { defaults.set(localModelID, forKey: "localModel") } }
     @Published var fallbackToLocal: Bool { didSet { defaults.set(fallbackToLocal, forKey: "fallbackToLocal") } }
+    @Published var mixtureOfExperts: Bool { didSet { defaults.set(mixtureOfExperts, forKey: "mixtureOfExperts") } }
     @Published var cleanupEnabled: Bool { didSet { defaults.set(cleanupEnabled, forKey: "cleanupEnabled") } }
     @Published var vocabularyText: String { didSet { defaults.set(vocabularyText, forKey: "vocabulary") } }
     @Published var dictionaryPacks: [String] { didSet { defaults.set(dictionaryPacks, forKey: "dictionaryPacks") } }
@@ -84,6 +85,7 @@ final class AppSettings: ObservableObject {
         cloudModels = defaults.dictionary(forKey: "cloudModels") as? [String: String] ?? [:]
         localModelID = defaults.string(forKey: "localModel") ?? WhisperModel.recommended.id
         fallbackToLocal = defaults.object(forKey: "fallbackToLocal") as? Bool ?? true
+        mixtureOfExperts = defaults.bool(forKey: "mixtureOfExperts")
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
         vocabularyText = defaults.string(forKey: "vocabulary") ?? Vocabulary.defaultText
         dictionaryPacks = defaults.stringArray(forKey: "dictionaryPacks") ?? []
@@ -105,6 +107,11 @@ final class AppSettings: ObservableObject {
         dictionaryPacks = VocabularyPack.all.map(\.id).filter { after.contains($0) }
     }
     var cloudProvider: CloudProviderID { CloudProviderID(rawValue: cloudProviderID) ?? .openAI }
+
+    /// Every cloud service with a key in the Keychain; Mixture of experts fans out to all of them.
+    var cloudProvidersWithKeys: [CloudProviderID] { CloudProviderID.allCases.filter { $0.apiKey != nil } }
+
+    var usesMixtureOfExperts: Bool { engineMode == .cloud && mixtureOfExperts }
 
     func cloudModel(for provider: CloudProviderID) -> String {
         cloudModels[provider.rawValue] ?? provider.defaultModel

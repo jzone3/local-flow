@@ -94,6 +94,31 @@ expect(env.map(\.name) == ["OPENAI_API_KEY", "ELEVENLABS_API_KEY", "GEMINI_API_K
 expect(env.first?.value == "sk-test-1234567890", "env value")
 expect(EnvironmentKeys.masked("sk-test-1234567890") == "sk-t…7890", "mask")
 
+// MixtureOfExperts
+let moe = [MixtureOfExperts.Transcript(service: "OpenAI", text: "I pushed to git hub today."),
+           MixtureOfExperts.Transcript(service: "ElevenLabs", text: " I pushed to GitHub today. "),
+           MixtureOfExperts.Transcript(service: "Google Gemini", text: "I pushed to GitHub today")]
+let prompt = MixtureOfExperts.mergePrompt(moe, terms: ["GitHub", "Devin"])
+expect(prompt.contains("3 transcripts"), "prompt counts transcripts")
+expect(prompt.contains("Transcript 2 (ElevenLabs):\nI pushed to GitHub today."), "prompt lists trimmed transcripts")
+expect(prompt.contains("GitHub, Devin."), "prompt carries dictionary terms")
+expect(!MixtureOfExperts.mergePrompt(moe, terms: []).contains("Spell these"), "no dictionary line without terms")
+expect(MixtureOfExperts.cleanAnswer("```\nHello there.\n```"), "Hello there.", "clean: fences")
+expect(MixtureOfExperts.cleanAnswer("```text\nHello there.\n```\n"), "Hello there.", "clean: fence with language")
+expect(MixtureOfExperts.cleanAnswer("\"Hello there.\""), "Hello there.", "clean: quotes")
+expect(MixtureOfExperts.cleanAnswer("“Hello there.”"), "Hello there.", "clean: curly quotes")
+expect(MixtureOfExperts.cleanAnswer("Transcript: Hello there."), "Hello there.", "clean: label")
+expect(MixtureOfExperts.cleanAnswer("He said \"hi\" and left."), "He said \"hi\" and left.", "clean: inner quotes kept")
+expect(MixtureOfExperts.cleanAnswer("  Plain.  "), "Plain.", "clean: trim")
+expect(MixtureOfExperts.engineLabel(services: ["OpenAI", "ElevenLabs", "Google Gemini"], merger: "gpt-5.4-mini"),
+       "Mixture of experts (OpenAI + ElevenLabs + Google Gemini → gpt-5.4-mini)", "engine label merged")
+expect(MixtureOfExperts.engineLabel(services: ["ElevenLabs"], merger: nil), "Mixture of experts (ElevenLabs only)", "engine label single")
+expect(MixtureOfExperts.engineLabel(services: ["ElevenLabs", "Google Gemini"], merger: nil), "Mixture of experts (ElevenLabs + Google Gemini, not merged)", "engine label unmerged")
+expect(MixtureOfExperts.bestSingle(Array(moe[1...]), preference: ["OpenAI", "ElevenLabs", "Google Gemini"])?.service == "ElevenLabs", "best single by preference")
+expect(MixtureOfExperts.bestSingle([], preference: ["OpenAI"]) == nil, "best single of nothing")
+expect(MixtureOfExperts.transcribingLabel(modelCount: 3), "Transcribing with 3 models…", "bar label")
+expect(MixtureOfExperts.transcribingLabel(modelCount: 1), "Transcribing…", "bar label single")
+
 // Version
 expect(Version("v1.2.3")! > Version("1.2")!, "version compare")
 expect(Version("0.10.0")! > Version("0.9.9")!, "version numeric compare")

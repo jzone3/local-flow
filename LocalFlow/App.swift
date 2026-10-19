@@ -12,7 +12,7 @@ struct LocalFlowApp: App {
             Text(controller.statusLine)
             Text(settings.engineMode == .local
                  ? "Local: On · nothing leaves this Mac"
-                 : "Local: Off · Cloud (\(settings.cloudProvider.title))")
+                 : "Local: Off · Cloud (\(settings.mixtureOfExperts ? MixtureOfExperts.title : settings.cloudProvider.title))")
             Divider()
             Button("Settings…") { WindowManager.shared.showSettings() }
                 .keyboardShortcut(",")

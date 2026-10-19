@@ -20,6 +20,7 @@ final class DictationController: ObservableObject {
 
     @Published private(set) var state: State = .idle
     @Published private(set) var lastWarning: String?
+    @Published private(set) var transcribingText = "Transcribing…"
     @Published private(set) var permissionProblem: String?
     @Published private(set) var hasMicrophone = AudioRecorder.hasPermission
     @Published private(set) var hasAccessibility = HotkeyMonitor.hasAccessibility
@@ -44,7 +45,7 @@ final class DictationController: ObservableObject {
         switch state {
         case .idle: return "Hold or double-tap \(settings.hotkey.displayName) to dictate"
         case .listening: return "Listening…"
-        case .transcribing: return "Transcribing…"
+        case .transcribing: return transcribingText
         case .done: return "Pasted"
         case .failed(let message): return message
         }
@@ -139,6 +140,7 @@ final class DictationController: ObservableObject {
             }
             return
         }
+        transcribingText = TranscriptionService.transcribingLabel()
         state = .transcribing
         let entryID = UUID()
         let audioURL = HistoryStore.shared.newAudioURL(id: entryID)
