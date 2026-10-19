@@ -11,7 +11,7 @@ enum TextCleanup {
 
     static let fillerWords: Set<String> = ["um", "umm", "ummm", "uh", "uhh", "uhm", "er", "erm", "ah", "ahh", "hmm", "hm", "mm", "mhm", "mmm"]
 
-    /// `vocabulary` only matters for `.code`: a first word the dictionary spells with a capital keeps it.
+    /// `vocabulary` only matters for `.code`: words are lowercased except dictionary terms and all-caps tokens.
     static func clean(_ raw: String, profile: CleanupProfile = .standard, vocabulary: Vocabulary? = nil, options: Options = .all) -> String {
         var text = raw
         text = removeNonSpeechTags(text)
@@ -23,7 +23,7 @@ enum TextCleanup {
             text = joinSpokenDomains(text)
             text = normalizeWhitespace(text).trimmingCharacters(in: .whitespacesAndNewlines)
             text = dropTrailingPeriod(text)
-            return lowercaseFirstWord(text, unlessIn: vocabulary)
+            return lowercaseWords(text, unlessIn: vocabulary)
         case .casual:
             text = fixPunctuationSpacing(text)
             text = normalizeWhitespace(text)
@@ -49,13 +49,25 @@ enum TextCleanup {
         return text.replacingOccurrences(of: #"(?i)(?<=[a-z0-9])\s+dot\s+(?=(?:"# + tlds + #")\b)"#, with: ".", options: .regularExpression)
     }
 
-    /// Whisper capitalises the first word of everything; code wants it as typed unless the dictionary says otherwise.
-    static func lowercaseFirstWord(_ text: String, unlessIn vocabulary: Vocabulary?) -> String {
-        guard let first = text.first, first.isUppercase else { return text }
-        let word = text.prefix { $0.isLetter || $0.isNumber }
-        let known = vocabulary?.terms.contains { $0 == word || $0.hasPrefix(word + " ") } ?? false
-        guard !known else { return text }
-        return first.lowercased() + text.dropFirst()
+    /// Commands are lowercase and the model's capitals are noise. Dictionary terms keep the dictionary's spelling;
+    /// all-caps tokens of two or more letters (PATH, JSON, API) stay as they are.
+    static func lowercaseWords(_ text: String, unlessIn vocabulary: Vocabulary?) -> String {
+        var out = "", word = ""
+        func flush() {
+            let letters = word.filter(\.isLetter)
+            let allCaps = letters.count >= 2 && letters.allSatisfy(\.isUppercase)
+            out += allCaps ? word : word.lowercased()
+            word = ""
+        }
+        for ch in text {
+            if ch.isLetter || ch.isNumber { word.append(ch) } else { flush(); out.append(ch) }
+        }
+        flush()
+        for term in vocabulary?.terms ?? [] {
+            let pattern = #"(?i)\b"# + NSRegularExpression.escapedPattern(for: term) + #"\b"#
+            out = out.replacingOccurrences(of: pattern, with: NSRegularExpression.escapedTemplate(for: term), options: .regularExpression)
+        }
+        return out
     }
 
     /// Lines Whisper tends to invent for silence or noise (trained on subtitled videos). A transcript that is nothing
