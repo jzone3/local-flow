@@ -124,4 +124,63 @@ expect(Version("v1.2.3")! > Version("1.2")!, "version compare")
 expect(Version("0.10.0")! > Version("0.9.9")!, "version numeric compare")
 expect(Version("abc") == nil, "bad version")
 
+
+// Hotkey
+let ctrl = Hotkey.controlFlag, opt = Hotkey.optionFlag, shift = Hotkey.shiftFlag, cmd = Hotkey.commandFlag, fnFlag = Hotkey.functionFlag
+expect(Hotkey(keyCode: 49, modifiers: ctrl).displayName, "⌃Space", "displayName ctrl space")
+expect(Hotkey(keyCode: 2, modifiers: opt | cmd).displayName, "⌥⌘D", "displayName opt cmd D")
+expect(Hotkey(keyCode: 49, modifiers: shift | opt).displayName, "⌥⇧Space", "displayName macOS modifier order")
+expect(Hotkey(keyCode: 123, modifiers: ctrl).displayName, "⌃←", "displayName arrow")
+expect(Hotkey(keyCode: 96, modifiers: 0).displayName, "F5", "displayName bare F-key")
+expect(Hotkey(keyCode: 36, modifiers: cmd | shift).displayName, "⇧⌘↩", "displayName return")
+expect(Hotkey.fn.displayName, "Fn", "displayName fn")
+expect(Hotkey.rightOption.displayName, "Right ⌥", "displayName right option")
+expect(Hotkey.comboModifiers(ctrl | fnFlag | Hotkey.numericPadFlag | Hotkey.capsLockFlag | 0x1234) == ctrl, "comboModifiers strips fn/keypad/capslock/device bits")
+
+var rec = HotkeyRecording()
+expect(rec.handle(.flagsChanged(keyCode: 59, flags: ctrl)) == .recording(modifiers: ctrl), "ctrl down shows live, no commit")
+expect(rec.handle(.keyDown(keyCode: 49, flags: ctrl)) == .committed(Hotkey(keyCode: 49, modifiers: ctrl)), "ctrl space commits combo")
+
+rec = HotkeyRecording()
+_ = rec.handle(.flagsChanged(keyCode: 58, flags: opt))
+expect(rec.handle(.flagsChanged(keyCode: 55, flags: opt | cmd)) == .recording(modifiers: opt | cmd), "second modifier adds live")
+expect(rec.handle(.keyDown(keyCode: 2, flags: opt | cmd)) == .committed(Hotkey(keyCode: 2, modifiers: opt | cmd)), "opt cmd D commits")
+
+rec = HotkeyRecording()
+_ = rec.handle(.flagsChanged(keyCode: 56, flags: shift))
+_ = rec.handle(.flagsChanged(keyCode: 58, flags: shift | opt))
+expect(rec.handle(.keyDown(keyCode: 49, flags: shift | opt | Hotkey.capsLockFlag)) == .committed(Hotkey(keyCode: 49, modifiers: shift | opt)), "shift opt space commits, caps lock ignored")
+
+rec = HotkeyRecording()
+expect(rec.handle(.flagsChanged(keyCode: 61, flags: opt)) == .recording(modifiers: opt), "right option down waits")
+expect(rec.handle(.flagsChanged(keyCode: 61, flags: 0)) == .committed(.rightOption), "right option released alone commits modifier-only")
+
+rec = HotkeyRecording()
+_ = rec.handle(.flagsChanged(keyCode: 63, flags: fnFlag))
+expect(rec.handle(.flagsChanged(keyCode: 63, flags: 0)) == .committed(.fn), "fn alone still records as Fn")
+
+rec = HotkeyRecording()
+_ = rec.handle(.flagsChanged(keyCode: 56, flags: shift))
+_ = rec.handle(.flagsChanged(keyCode: 58, flags: shift | opt))
+expect(rec.handle(.flagsChanged(keyCode: 58, flags: shift)) == .recording(modifiers: shift), "releasing one of two modifiers keeps recording")
+expect(rec.handle(.flagsChanged(keyCode: 56, flags: 0)) == .recording(modifiers: 0), "two modifiers released with no key: nothing committed")
+
+rec = HotkeyRecording()
+_ = rec.handle(.flagsChanged(keyCode: 59, flags: ctrl))
+expect(rec.handle(.keyDown(keyCode: 53, flags: ctrl)) == .cancelled, "esc cancels")
+
+rec = HotkeyRecording()
+expect(rec.handle(.keyDown(keyCode: 49, flags: 0)) == .recording(modifiers: 0), "bare space is refused")
+expect(rec.handle(.keyDown(keyCode: 96, flags: fnFlag)) == .committed(Hotkey(keyCode: 96, modifiers: 0)), "bare F5 is allowed, fn bit dropped")
+
+rec = HotkeyRecording()
+_ = rec.handle(.flagsChanged(keyCode: 59, flags: ctrl))
+expect(rec.handle(.keyDown(keyCode: 123, flags: ctrl | fnFlag | Hotkey.numericPadFlag)) == .committed(Hotkey(keyCode: 123, modifiers: ctrl)), "ctrl left arrow drops the fn/keypad bits")
+
+let tapped: UInt = ctrl | 0x2000_0000  // NSEvent(cgEvent:) carries undocumented high bits
+expect(Hotkey.comboModifiers(tapped) == ctrl, "tapped events' extra bits are dropped for matching")
+rec = HotkeyRecording()
+_ = rec.handle(.flagsChanged(keyCode: 59, flags: tapped))
+expect(rec.handle(.flagsChanged(keyCode: 59, flags: 0x2000_0000)) == .committed(Hotkey(keyCode: 59, modifiers: ctrl)), "release with extra bits still counts as all-up")
+
 if failures == 0 { print("core tests passed") } else { print("\(failures) failure(s)"); exit(1) }

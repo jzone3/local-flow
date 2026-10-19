@@ -414,56 +414,86 @@ struct AboutSettings: View {
     }
 }
 
-/// Click, then press the key (or hold a modifier) you want.
+/// Click, then press the key combo (or hold a modifier) you want.
 struct HotkeyRecorder: View {
     @Binding var hotkey: Hotkey
     @State private var recording = false
+    @State private var held: UInt = 0
+    @State private var hint: String?
+    @State private var tap: KeyTap?
     @State private var monitor: Any?
 
     var body: some View {
-        HStack {
-            Text("Hold to talk")
-            Spacer()
-            Button(recording ? "Press a key…" : hotkey.displayName) { recording ? stop() : begin() }
-                .frame(minWidth: 120)
-                .actionButton(prominent: recording)
-            Menu("Presets") {
-                Button("Fn") { hotkey = .fn }
-                Button("Right ⌥") { hotkey = .rightOption }
-                Button("Right ⌘") { hotkey = .rightCommand }
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack {
+                Text("Hold to talk")
+                Spacer()
+                Button(label) { recording ? stop() : begin() }
+                    .frame(minWidth: 120)
+                    .actionButton(prominent: recording)
+                Menu("Presets") {
+                    Button("Fn") { hotkey = .fn }
+                    Button("Right ⌥") { hotkey = .rightOption }
+                    Button("Right ⌘") { hotkey = .rightCommand }
+                }
+                .frame(width: 90)
             }
-            .frame(width: 90)
+            if let hint {
+                Text(hint).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
+    private var label: String {
+        guard recording else { return hotkey.displayName }
+        return held == 0 ? "Press a key…" : Hotkey.symbols(for: held) + "…"
+    }
+
+    /// Through the event tap when Accessibility is granted, so combos macOS claims (⌃Space, ⌘Space) still reach us;
+    /// otherwise a local monitor, which only sees what the system lets through to the window.
     private func begin() {
         recording = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
-            if event.type == .flagsChanged {
-                guard Hotkey.modifierKeyCodes[event.keyCode] != nil,
-                      !event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return nil }
-                let flag: NSEvent.ModifierFlags
-                switch event.keyCode {
-                case 63: flag = .function
-                case 54, 55: flag = .command
-                case 58, 61: flag = .option
-                case 59, 62: flag = .control
-                case 56, 60: flag = .shift
-                default: flag = .capsLock
-                }
-                hotkey = Hotkey(keyCode: event.keyCode, modifiers: flag.rawValue)
-            } else {
-                if event.keyCode == 53 { stop(); return nil }
-                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
-                hotkey = Hotkey(keyCode: event.keyCode, modifiers: flags.rawValue)
+        held = 0
+        hint = nil
+        DictationController.shared.hotkeyPaused = true
+        var state = HotkeyRecording()
+        var swallowUp: UInt16?  // the committed key's key-up, so e.g. ⌘Space doesn't still open Spotlight
+        let handle: (NSEvent) -> Bool = { event in
+            if event.type == .keyUp {
+                guard event.keyCode == swallowUp else { return false }
+                stop()
+                return true
             }
-            stop()
-            return nil
+            let input: HotkeyRecording.Event = event.type == .flagsChanged
+                ? .flagsChanged(keyCode: event.keyCode, flags: event.modifierFlags.rawValue)
+                : .keyDown(keyCode: event.keyCode, flags: event.modifierFlags.rawValue)
+            switch state.handle(input) {
+            case let .recording(modifiers):
+                held = modifiers
+            case let .committed(key):
+                hotkey = key
+                if key.isUsedBySystem { hint = "\(key.displayName) is also a macOS shortcut; Local Flow takes it over while running." }
+                recording = false
+                held = 0
+                swallowUp = key.isModifierOnly ? nil : key.keyCode
+                if swallowUp == nil { stop() }
+            case .cancelled:
+                stop()
+            }
+            return event.type != .flagsChanged
+        }
+        tap = KeyTap(handler: handle)
+        if tap == nil {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { handle($0) ? nil : $0 }
         }
     }
 
     private func stop() {
         recording = false
+        held = 0
+        DictationController.shared.hotkeyPaused = false
+        tap?.stop()
+        tap = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
     }
