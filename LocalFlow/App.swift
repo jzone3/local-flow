@@ -12,7 +12,7 @@ struct LocalFlowApp: App {
             Text(controller.statusLine)
             Text(settings.engineMode == .local
                  ? "Local: On · nothing leaves this Mac"
-                 : "Local: Off · Cloud (\(settings.cloudProvider.title))")
+                 : "Local: Off · Cloud (\(settings.mixtureOfExperts ? MixtureOfExperts.title : settings.cloudProvider.title))")
             Divider()
             Button("Settings…") { WindowManager.shared.showSettings() }
                 .keyboardShortcut(",")
@@ -33,8 +33,16 @@ struct LocalFlowApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A second copy would add a second menu bar icon and paste every dictation twice.
+        if let bundleID = Bundle.main.bundleIdentifier,
+           NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+               .contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }) {
+            NSApp.terminate(nil)
+            return
+        }
         NSApp.setActivationPolicy(.accessory)
         _ = HistoryStore.shared
+        WhisperModel.removeRetiredFiles()
         DictationController.shared.start()
         Welcome.showIfNeeded {
             if AppSettings.shared.onboardingDone {
@@ -58,7 +66,8 @@ final class WindowManager {
     static let shared = WindowManager()
     private var windows: [String: NSWindow] = [:]
 
-    func showSettings() { show("settings", title: "Local Flow Settings", size: NSSize(width: 640, height: 560)) { SettingsView() } }
+    @discardableResult
+    func showSettings() -> NSWindow { show("settings", title: "Local Flow Settings", size: NSSize(width: 640, height: 560)) { SettingsView() } }
     func showHistory() { show("history", title: "History", size: NSSize(width: 560, height: 480)) { HistoryView() } }
     func showLastTranscript() { show("last", title: "Last Transcript", size: NSSize(width: 460, height: 260)) { LastTranscriptView() } }
     func showOnboarding() {
@@ -68,11 +77,12 @@ final class WindowManager {
     func close(_ key: String) { windows[key]?.close() }
 
     /// `fixed` windows (setup) have one size and no visible title bar, so the content sits under the traffic lights.
-    private func show<V: View>(_ key: String, title: String, size: NSSize, fixed: Bool = false, @ViewBuilder content: () -> V) {
+    @discardableResult
+    private func show<V: View>(_ key: String, title: String, size: NSSize, fixed: Bool = false, @ViewBuilder content: () -> V) -> NSWindow {
         NSApp.activate(ignoringOtherApps: true)
         if let window = windows[key] {
             window.makeKeyAndOrderFront(nil)
-            return
+            return window
         }
         var style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable]
         if fixed { style.insert(.fullSizeContentView) } else { style.insert(.resizable) }
@@ -88,12 +98,14 @@ final class WindowManager {
             ? AnyView(content().windowMaterial())
             : AnyView(content().frame(minWidth: size.width, minHeight: size.height).windowMaterial())
         window.contentViewController = NSHostingController(rootView: root)
+        window.setContentSize(size)
         window.center()
         window.makeKeyAndOrderFront(nil)
         windows[key] = window
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
         }
+        return window
     }
 }
 

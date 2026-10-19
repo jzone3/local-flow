@@ -8,54 +8,6 @@ enum EngineMode: String, CaseIterable, Identifiable {
     var title: String { self == .local ? "Local only" : "Cloud" }
 }
 
-/// A hotkey is either a lone modifier held down (Fn, Right Option…) or a regular key with optional modifiers.
-struct Hotkey: Codable, Equatable {
-    var keyCode: UInt16
-    var modifiers: UInt  // NSEvent.ModifierFlags.rawValue, device-independent
-
-    static let fn = Hotkey(keyCode: 63, modifiers: NSEvent.ModifierFlags.function.rawValue)
-    static let rightOption = Hotkey(keyCode: 61, modifiers: NSEvent.ModifierFlags.option.rawValue)
-    static let rightCommand = Hotkey(keyCode: 54, modifiers: NSEvent.ModifierFlags.command.rawValue)
-
-    static let modifierKeyCodes: [UInt16: String] = [
-        63: "Fn", 54: "Right ⌘", 55: "⌘", 58: "⌥", 61: "Right ⌥", 59: "⌃", 62: "Right ⌃", 56: "⇧", 60: "Right ⇧", 57: "⇪",
-    ]
-
-    var isModifierOnly: Bool { Hotkey.modifierKeyCodes[keyCode] != nil }
-    var isFn: Bool { keyCode == Hotkey.fn.keyCode }
-
-    /// True when macOS's own Dictation shortcut is "Press Fn twice" (symbolic hotkey 164),
-    /// which fights with our double-tap. Read live from com.apple.symbolichotkeys.
-    static var systemDictationUsesFnTwice: Bool {
-        guard let hotkeys = UserDefaults(suiteName: "com.apple.symbolichotkeys")?
-                .dictionary(forKey: "AppleSymbolicHotKeys"),
-              let entry = hotkeys["164"] as? [String: Any] else { return true }  // stock Macs default to Fn twice
-        let enabled = (entry["enabled"] as? NSNumber)?.boolValue ?? false
-        let params = (entry["value"] as? [String: Any])?["parameters"] as? [NSNumber] ?? []
-        return enabled && params.first?.intValue == 8_388_608
-    }
-
-    var displayName: String {
-        if let name = Hotkey.modifierKeyCodes[keyCode] { return name }
-        var parts: [String] = []
-        let flags = NSEvent.ModifierFlags(rawValue: modifiers)
-        if flags.contains(.control) { parts.append("⌃") }
-        if flags.contains(.option) { parts.append("⌥") }
-        if flags.contains(.shift) { parts.append("⇧") }
-        if flags.contains(.command) { parts.append("⌘") }
-        if flags.contains(.function) { parts.append("Fn") }
-        parts.append(Hotkey.keyName(keyCode))
-        return parts.joined()
-    }
-
-    static func keyName(_ code: UInt16) -> String {
-        let special: [UInt16: String] = [49: "Space", 36: "↩", 48: "⇥", 51: "⌫", 53: "⎋", 122: "F1", 120: "F2", 99: "F3", 118: "F4", 96: "F5", 97: "F6", 98: "F7", 100: "F8", 101: "F9", 109: "F10", 103: "F11", 111: "F12", 123: "←", 124: "→", 125: "↓", 126: "↑"]
-        if let s = special[code] { return s }
-        let letters: [UInt16: String] = [0: "A", 11: "B", 8: "C", 2: "D", 14: "E", 3: "F", 5: "G", 4: "H", 34: "I", 38: "J", 40: "K", 37: "L", 46: "M", 45: "N", 31: "O", 35: "P", 12: "Q", 15: "R", 1: "S", 17: "T", 32: "U", 9: "V", 13: "W", 7: "X", 16: "Y", 6: "Z", 29: "0", 18: "1", 19: "2", 20: "3", 21: "4", 23: "5", 22: "6", 26: "7", 28: "8", 25: "9"]
-        return letters[code] ?? "Key \(code)"
-    }
-}
-
 /// All user preferences, backed by UserDefaults. API keys live in the Keychain (see `Keychain`).
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
@@ -66,6 +18,7 @@ final class AppSettings: ObservableObject {
     @Published var cloudModels: [String: String] { didSet { defaults.set(cloudModels, forKey: "cloudModels") } }
     @Published var localModelID: String { didSet { defaults.set(localModelID, forKey: "localModel") } }
     @Published var fallbackToLocal: Bool { didSet { defaults.set(fallbackToLocal, forKey: "fallbackToLocal") } }
+    @Published var mixtureOfExperts: Bool { didSet { defaults.set(mixtureOfExperts, forKey: "mixtureOfExperts") } }
     @Published var cleanupEnabled: Bool { didSet { defaults.set(cleanupEnabled, forKey: "cleanupEnabled") } }
     @Published var vocabularyText: String { didSet { defaults.set(vocabularyText, forKey: "vocabulary") } }
     @Published var dictionaryPacks: [String] { didSet { defaults.set(dictionaryPacks, forKey: "dictionaryPacks") } }
@@ -82,8 +35,9 @@ final class AppSettings: ObservableObject {
         engineMode = EngineMode(rawValue: defaults.string(forKey: "engineMode") ?? "") ?? .local
         cloudProviderID = defaults.string(forKey: "cloudProvider") ?? CloudProviderID.openAI.rawValue
         cloudModels = defaults.dictionary(forKey: "cloudModels") as? [String: String] ?? [:]
-        localModelID = defaults.string(forKey: "localModel") ?? WhisperModel.recommended.id
+        localModelID = WhisperModel.named(defaults.string(forKey: "localModel") ?? WhisperModel.recommended.id).id
         fallbackToLocal = defaults.object(forKey: "fallbackToLocal") as? Bool ?? true
+        mixtureOfExperts = defaults.bool(forKey: "mixtureOfExperts")
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
         vocabularyText = defaults.string(forKey: "vocabulary") ?? Vocabulary.defaultText
         dictionaryPacks = defaults.stringArray(forKey: "dictionaryPacks") ?? []
@@ -105,6 +59,11 @@ final class AppSettings: ObservableObject {
         dictionaryPacks = VocabularyPack.all.map(\.id).filter { after.contains($0) }
     }
     var cloudProvider: CloudProviderID { CloudProviderID(rawValue: cloudProviderID) ?? .openAI }
+
+    /// Every cloud service with a key in the Keychain; Mixture of experts fans out to all of them.
+    var cloudProvidersWithKeys: [CloudProviderID] { CloudProviderID.allCases.filter { $0.apiKey != nil } }
+
+    var usesMixtureOfExperts: Bool { engineMode == .cloud && mixtureOfExperts }
 
     func cloudModel(for provider: CloudProviderID) -> String {
         cloudModels[provider.rawValue] ?? provider.defaultModel

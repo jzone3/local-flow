@@ -34,6 +34,12 @@ final class AudioRecorder: ObservableObject {
 
     static var hasPermission: Bool { AVCaptureDevice.authorizationStatus(for: .audio) == .authorized }
 
+    /// True once the user has answered the system prompt with "Don't Allow"; only System Settings can change it then.
+    static var isDenied: Bool {
+        let status = AVCaptureDevice.authorizationStatus(for: .audio)
+        return status == .denied || status == .restricted
+    }
+
     func start() throws {
         guard !isRecording else { return }
         resumeMonitoring = monitoring
@@ -94,11 +100,13 @@ final class AudioRecorder: ObservableObject {
         monitorLevel = 0
     }
 
-    /// Points the input node at the microphone chosen in Settings (system default when none is chosen).
+    /// Points the input node at the microphone chosen in Settings. With no choice (or an unplugged one) it goes
+    /// back to the system default explicitly: the input unit otherwise keeps whatever device was set last.
     private func selectDevice(on input: AVAudioInputNode) {
-        guard let uid = AppSettings.shared.inputDeviceUID,
-              let device = AudioInputDevice.all.first(where: { $0.uid == uid }),
-              let unit = input.audioUnit else { return }
+        guard let unit = input.audioUnit else { return }
+        let devices = AudioInputDevice.all
+        let picked = AppSettings.shared.inputDeviceUID.flatMap { uid in devices.first { $0.uid == uid } }
+        guard let device = picked ?? AudioInputDevice.systemDefault else { return }
         var id = device.id
         AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
                              &id, UInt32(MemoryLayout<AudioDeviceID>.size))

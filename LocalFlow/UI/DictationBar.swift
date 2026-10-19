@@ -5,6 +5,7 @@ import SwiftUI
 /// The floating pill at the bottom of the screen. Liquid Glass on macOS 26, frosted material before that.
 final class DictationBarPanel: NSPanel {
     private var resize: AnyCancellable?
+    private var hideGeneration = 0
 
     init() {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 360, height: 72),
@@ -35,6 +36,7 @@ final class DictationBarPanel: NSPanel {
     }
 
     func show() {
+        hideGeneration += 1   // a hide() still fading out must not order the panel out from under us
         position()
         if !isVisible { orderFrontRegardless() }
         NSAnimationContext.runAnimationGroup { ctx in
@@ -44,11 +46,13 @@ final class DictationBarPanel: NSPanel {
     }
 
     func hide() {
+        hideGeneration += 1
+        let generation = hideGeneration
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.22
             animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            guard let self, alphaValue == 0 else { return }
+            guard let self, generation == hideGeneration, alphaValue == 0 else { return }
             orderOut(nil)
         })
     }
@@ -96,7 +100,7 @@ struct DictationBarView: View {
         case .transcribing:
             HStack(spacing: 12) {
                 ProgressView().controlSize(.small)
-                Text("Transcribing…").font(.system(size: 13, weight: .medium))
+                Text(controller.transcribingText).font(.system(size: 13, weight: .medium))
             }
         case .done:
             HStack(spacing: 10) {

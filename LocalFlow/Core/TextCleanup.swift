@@ -11,16 +11,105 @@ enum TextCleanup {
 
     static let fillerWords: Set<String> = ["um", "umm", "ummm", "uh", "uhh", "uhm", "er", "erm", "ah", "ahh", "hmm", "hm", "mm", "mhm", "mmm"]
 
-    static func clean(_ raw: String, options: Options = .all) -> String {
+    /// `vocabulary` only matters for `.code`: words are lowercased except dictionary terms and all-caps tokens.
+    static func clean(_ raw: String, profile: CleanupProfile = .standard, vocabulary: Vocabulary? = nil, options: Options = .all) -> String {
         var text = raw
         text = removeNonSpeechTags(text)
         if options.removeFillers { text = removeFillers(text) }
         if options.collapseStutters { text = collapseStutters(text) }
         if options.voiceCommands { text = applyVoiceCommands(text) }
-        text = fixPunctuationSpacing(text)
-        text = normalizeWhitespace(text)
-        text = capitalizeSentences(text)
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch profile {
+        case .code:
+            text = joinSpokenDomains(text)
+            text = normalizeWhitespace(text).trimmingCharacters(in: .whitespacesAndNewlines)
+            text = dropTrailingPeriod(text)
+            return lowercaseWords(text, unlessIn: vocabulary)
+        case .casual:
+            text = fixPunctuationSpacing(text)
+            text = normalizeWhitespace(text)
+            text = capitalizeSentences(text)
+            return dropTrailingPeriod(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        case .standard:
+            text = fixPunctuationSpacing(text)
+            text = normalizeWhitespace(text)
+            text = capitalizeSentences(text)
+            return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    /// One final period the model added; "?" and "!" and "..." stay.
+    static func dropTrailingPeriod(_ text: String) -> String {
+        guard text.hasSuffix("."), !text.hasSuffix("..") else { return text }
+        return String(text.dropLast())
+    }
+
+    /// "example dot com" → "example.com"; only before a known top-level domain so "a dot product" is left alone.
+    static func joinSpokenDomains(_ text: String) -> String {
+        let tlds = "com|net|org|io|dev|app|ai|co|edu|gov|me|us|uk|de|fr|ca|info|xyz|sh|tv"
+        return text.replacingOccurrences(of: #"(?i)(?<=[a-z0-9])\s+dot\s+(?=(?:"# + tlds + #")\b)"#, with: ".", options: .regularExpression)
+    }
+
+    /// Commands are lowercase and the model's capitals are noise. Dictionary terms keep the dictionary's spelling;
+    /// all-caps tokens of two or more letters (PATH, JSON, API) stay as they are.
+    static func lowercaseWords(_ text: String, unlessIn vocabulary: Vocabulary?) -> String {
+        var out = "", word = ""
+        func flush() {
+            let letters = word.filter(\.isLetter)
+            let allCaps = letters.count >= 2 && letters.allSatisfy(\.isUppercase)
+            out += allCaps ? word : word.lowercased()
+            word = ""
+        }
+        for ch in text {
+            if ch.isLetter || ch.isNumber { word.append(ch) } else { flush(); out.append(ch) }
+        }
+        flush()
+        for term in vocabulary?.terms ?? [] {
+            let pattern = #"(?i)\b"# + NSRegularExpression.escapedPattern(for: term) + #"\b"#
+            out = out.replacingOccurrences(of: pattern, with: NSRegularExpression.escapedTemplate(for: term), options: .regularExpression)
+        }
+        return out
+    }
+
+    /// Lines Whisper tends to invent for silence or noise (trained on subtitled videos). A transcript that is nothing
+    /// but one of these is treated as "nothing said".
+    static let hallucinations: Set<String> = [
+        "thanks for watching", "thank you for watching", "thanks for listening", "thank you for listening",
+        "please subscribe", "like and subscribe", "don't forget to subscribe", "see you in the next video",
+        "see you next time", "subtitles by the amara org community", "subtitles by amara org", "transcribed by",
+        "the end", "you", "bye", "music", "silence", "blank audio", "inaudible", "foreign",
+    ]
+
+    static func isHallucination(_ text: String) -> Bool {
+        let key = hallucinationKey(text)
+        return key.isEmpty || hallucinations.contains(key)
+    }
+
+    private static func hallucinationKey(_ text: String) -> String {
+        text.lowercased().unicodeScalars
+            .map { CharacterSet.alphanumerics.contains($0) || $0 == " " ? Character($0) : Character(" ") }
+            .reduce(into: "") { $0.append($1) }
+            .split(separator: " ").joined(separator: " ")
+    }
+
+    /// Whisper hears trailing silence as a lone "you". Segments that end a transcript with only that word are dropped.
+    static func dropTrailingSilenceEcho(_ segments: [String]) -> [String] {
+        var kept = segments
+        while let last = kept.last, hallucinationKey(last) == "you" || hallucinationKey(last).isEmpty { kept.removeLast() }
+        return kept
+    }
+
+    /// Spacing for pasting at a caret: a space before when the text would otherwise glue onto a word or punctuation,
+    /// and a space after when it would run into a following word.
+    static func fit(_ text: String, before: String, after: String) -> String {
+        guard !text.isEmpty else { return text }
+        var out = text
+        if let last = before.last, !last.isWhitespace, !last.isNewline, !"([{\"'“‘/-–—".contains(last) {
+            out = " " + out
+        }
+        if let next = after.first, next.isLetter || next.isNumber {
+            out += " "
+        }
+        return out
     }
 
     /// Whisper-style annotations such as `[BLANK_AUDIO]`, `(laughs)`, `*music*`, `♪`.

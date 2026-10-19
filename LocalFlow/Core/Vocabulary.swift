@@ -55,7 +55,16 @@ struct Vocabulary: Equatable {
         guard !picked.isEmpty else { return "" }
         // A plain spoken sentence, not a bare list: a comma list of capitalized terms biases Whisper into Title Case.
         let list = picked.count > 1 ? picked.dropLast().joined(separator: ", ") + " and " + picked.last! : picked[0]
-        return "Okay, so here are some names and terms I use a lot: " + list + ". Let's get started."
+        return Self.promptOpener + list + ". Let's get started."
+    }
+
+    static let promptOpener = "Okay, so here are some names and terms I use a lot: "
+
+    /// True when a piece of transcript is the hint read back rather than speech: on a quiet window Whisper
+    /// sometimes echoes its prompt instead of staying silent.
+    static func isPromptEcho(_ text: String) -> Bool {
+        let letters = { (s: String) in s.lowercased().filter(\.isLetter) }
+        return letters(text).contains(letters(promptOpener))
     }
 
     /// Terms safe for keyword/keyterm API fields (ElevenLabs: ≤5 words, <50 chars, no brackets).

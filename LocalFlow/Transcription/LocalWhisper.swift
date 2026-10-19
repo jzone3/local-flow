@@ -17,14 +17,14 @@ struct WhisperModel: Identifiable, Equatable {
     static let all: [WhisperModel] = [
         WhisperModel(id: "large-v3-turbo", title: "Best", file: "large-v3-turbo", detail: "Most accurate. Still instant on Apple silicon.", bytes: 1_624_555_275),
         WhisperModel(id: "large-v3-turbo-q5_0", title: "Classic", file: "large-v3-turbo-q5_0", detail: "Same model, a third of the size. Nearly as accurate.", bytes: 574_041_195),
-        WhisperModel(id: "base", title: "Tiny", file: "base", detail: "Small and fast. Fine for short notes and older Macs.", bytes: 147_951_465),
+        WhisperModel(id: "small", title: "Tiny", file: "small", detail: "Small and fast. Fine for short notes and older Macs.", bytes: 487_601_967),
     ]
 
     static let recommended = all[0]
 
     /// Older builds stored other model IDs; those map to the nearest tier.
     static func named(_ id: String) -> WhisperModel {
-        all.first { $0.id == id } ?? (["large-v3", "medium.en", "medium"].contains(id) ? recommended : id.hasPrefix("small") ? all[1] : id.hasPrefix("base") ? all[2] : recommended)
+        all.first { $0.id == id } ?? (["large-v3", "medium.en", "medium"].contains(id) ? recommended : id.hasPrefix("small") || id.hasPrefix("base") ? all[2] : recommended)
     }
 
     static var directory: URL {
@@ -35,6 +35,11 @@ struct WhisperModel: Identifiable, Equatable {
 
     var localURL: URL { WhisperModel.directory.appendingPathComponent(fileName) }
     var isDownloaded: Bool { FileManager.default.fileExists(atPath: localURL.path) }
+
+    /// The Tiny tier used to be ggml-base; nothing loads that file any more.
+    static func removeRetiredFiles() {
+        try? FileManager.default.removeItem(at: directory.appendingPathComponent("ggml-base.bin"))
+    }
 }
 
 /// Downloads a model file with progress, writing to a temp file so a half download never looks installed.
@@ -71,6 +76,11 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
         try? FileManager.default.removeItem(at: model.localURL)
         LocalWhisper.shared.unloadIfCurrent(model)
         installedVersion += 1
+        // Keep the selection on a model that exists, or dictation fails until the user notices the radio.
+        if AppSettings.shared.localModelID == model.id,
+           let next = WhisperModel.all.first(where: { $0.isDownloaded }) {
+            AppSettings.shared.localModelID = next.id
+        }
     }
 
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
@@ -99,6 +109,10 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
             self.progress[id] = nil
             self.errors[id] = failure
             self.installedVersion += 1
+            // A fresh install picks "Best" by default; if that one isn't on disk, the model just fetched becomes the active one.
+            if failure == nil, !WhisperModel.named(AppSettings.shared.localModelID).isDownloaded {
+                AppSettings.shared.localModelID = id
+            }
         }
     }
 
@@ -142,7 +156,7 @@ final class LocalWhisper: TranscriptionProvider {
 
     private func loadedContext(for model: WhisperModel) throws -> OpaquePointer {
         if let context, loadedModelID == model.id { return context }
-        guard model.isDownloaded else { throw TranscriptionError.modelMissing }
+        guard model.isDownloaded else { throw TranscriptionError.modelMissing(model.title) }
         if let context { whisper_free(context); self.context = nil }
         var params = whisper_context_default_params()
         params.use_gpu = true
@@ -183,11 +197,16 @@ final class LocalWhisper: TranscriptionProvider {
         params.print_realtime = false
         params.print_timestamps = false
         params.print_special = false
-        params.no_timestamps = true
+        // Timestamps stay on even though we never show them: without them whisper.cpp treats every 30 s window as
+        // finished the moment the decoder stops, so one early stop or echoed prompt silently drops the rest of
+        // the window. With them it only advances to the last timestamp and retries a window that produced nothing.
+        params.no_timestamps = false
         params.single_segment = false
         params.suppress_blank = true
         params.suppress_nst = true
-        params.temperature_inc = 0.2
+        // whisper.cpp's temperature fallback samples, so the same audio can come back with different words. Tiny
+        // (ggml-small) never needs it; the bigger models keep it as a safety net.
+        params.temperature_inc = model == WhisperModel.all[2] ? 0 : 0.2
         params.no_speech_thold = 0.6
         params.translate = false
 
@@ -200,6 +219,10 @@ final class LocalWhisper: TranscriptionProvider {
                 params.language = langPtr
                 params.detect_language = false
                 params.initial_prompt = hint.isEmpty ? nil : hintPtr
+                // Every window is conditioned on the dictionary hint alone. Carrying decoded text forward lets one
+                // bad window (silence heard as "Thank you.") poison the rest of a long dictation.
+                params.carry_initial_prompt = true
+                params.n_max_text_ctx = hint.isEmpty ? 0 : whisper_token_count(ctx, hintPtr) + 1
                 return samples.withUnsafeBufferPointer { buffer in
                     whisper_full(ctx, params, buffer.baseAddress, Int32(buffer.count))
                 }
@@ -207,10 +230,12 @@ final class LocalWhisper: TranscriptionProvider {
         }
         guard status == 0 else { throw TranscriptionError.modelFailed("whisper_full returned \(status)") }
 
-        var text = ""
+        var pieces: [String] = []
         for i in 0..<whisper_full_n_segments(ctx) {
-            if let segment = whisper_full_get_segment_text(ctx, i) { text += String(cString: segment) }
+            guard let segment = whisper_full_get_segment_text(ctx, i) else { continue }
+            let piece = String(cString: segment)
+            if !Vocabulary.isPromptEcho(piece) { pieces.append(piece) }
         }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return TextCleanup.dropTrailingSilenceEcho(pieces).joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

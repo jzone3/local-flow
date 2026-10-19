@@ -18,7 +18,7 @@ enum TranscriptionError: LocalizedError {
     case http(status: Int, body: String)
     case network(Error)
     case badResponse(String)
-    case modelMissing
+    case modelMissing(String)
     case modelFailed(String)
     case cancelled
     case allFailed(primary: Error, fallback: Error?)
@@ -40,11 +40,20 @@ enum TranscriptionError: LocalizedError {
             // Bodies are usually JSON or an HTML error page; neither belongs in the bar.
             var detail = String(body.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160))
             if detail.hasPrefix("{") || detail.hasPrefix("<") || detail.hasPrefix("[") { detail = "" }
-            if status == 401 || status == 403 { detail = "the API key was rejected" }
+            // Gemini answers a bad key with 400 + "API key not valid" / API_KEY_INVALID rather than 401.
+            if status == 401 || status == 403 || body.contains("API_KEY_INVALID")
+                || body.localizedCaseInsensitiveContains("api key not valid")
+                || body.localizedCaseInsensitiveContains("invalid api key") {
+                detail = "the API key was rejected"
+            }
             return "Server error \(status)" + (detail.isEmpty ? "" : ": \(detail)")
         case .network(let error): return error.localizedDescription
         case .badResponse(let why): return "Unexpected response: \(why)"
-        case .modelMissing: return "No local Whisper model downloaded yet. Pick one in Settings → Transcription."
+        case .modelMissing(let title):
+            if WhisperModel.all.contains(where: { $0.isDownloaded }) {
+                return "Whisper \(title) isn't downloaded. Pick a downloaded model in Settings → Transcription."
+            }
+            return "No local Whisper model downloaded yet. Pick one in Settings → Transcription."
         case .modelFailed(let why): return "Local model failed: \(why)"
         case .cancelled: return "Cancelled"
         case .allFailed(let primary, let fallback):

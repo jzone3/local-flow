@@ -40,6 +40,7 @@ struct GeneralSettings: View {
             .onAppear { fnConflict = Hotkey.systemDictationUsesFnTwice }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 fnConflict = Hotkey.systemDictationUsesFnTwice
+                controller.refreshPermissions()   // the user usually comes back from System Settings
             }
             Section("Microphone") {
                 MicrophonePicker()
@@ -110,8 +111,6 @@ struct TranscriptionSettings: View {
 
 struct CloudSettings: View {
     @ObservedObject private var settings = AppSettings.shared
-    @State private var key = ""
-    @State private var saved = false
     @State private var keyChanged = 0  // bumps so the "Key stored" line re-reads the Keychain
 
     private var provider: CloudProviderID { settings.cloudProvider }
@@ -125,22 +124,12 @@ struct CloudSettings: View {
                                                set: { settings.setCloudModel($0, for: provider) })) {
                 ForEach(provider.models, id: \.id) { Text($0.title).tag($0.id) }
             }
-            HStack {
-                SecureField("API key", text: $key)
-                    .textFieldStyle(.roundedBorder)
-                Button(saved ? "Saved" : "Save") {
-                    Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: provider.keychainAccount)
-                    saved = true
-                    keyChanged += 1
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { saved = false }
-                }
-                .disabled(key.isEmpty)
-                .actionButton(prominent: true)
-            }
+            ProviderKeyField(provider: provider) { keyChanged += 1 }
+                .id(provider.rawValue)
             HStack {
                 if provider.apiKey != nil {
                     Label { Text("Key stored in your Keychain") } icon: { Icon("check-circle", size: 14) }.foregroundStyle(.green)
-                    Button("Remove") { Keychain.delete(provider.keychainAccount); key = ""; keyChanged += 1 }
+                    Button("Remove") { Keychain.delete(provider.keychainAccount); keyChanged += 1 }
                         .actionButton().controlSize(.small)
                 } else {
                     Label { Text("No key saved") } icon: { Icon("key", size: 14) }.foregroundStyle(.secondary)
@@ -152,7 +141,53 @@ struct CloudSettings: View {
             EnvironmentKeyPicker(provider: provider) { keyChanged += 1 }
                 .id("\(provider.rawValue)-\(keyChanged)")
         }
-        .onChange(of: settings.cloudProviderID) { _, _ in key = "" }
+        Section {
+            MixtureOfExpertsToggle()
+                .id(keyChanged)
+        }
+    }
+}
+
+/// "Mixture of experts" toggle with its explanation; the captions re-read the Keychain whenever the parent re-creates it.
+struct MixtureOfExpertsToggle: View {
+    @ObservedObject private var settings = AppSettings.shared
+
+    var body: some View {
+        Toggle(MixtureOfExperts.title, isOn: $settings.mixtureOfExperts)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(MixtureOfExperts.explanation)
+            if settings.cloudProvidersWithKeys.count < 2 {
+                Text(MixtureOfExperts.needMoreKeys)
+            }
+            if CloudProviderID.openAI.apiKey == nil {
+                Text(MixtureOfExperts.needOpenAIKey)
+            }
+        }
+        .font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// SecureField + Save for one provider's key. Shared by Settings and the setup flow.
+struct ProviderKeyField: View {
+    let provider: CloudProviderID
+    var onSaved: () -> Void = {}
+    @State private var key = ""
+    @State private var saved = false
+
+    var body: some View {
+        HStack {
+            SecureField("\(provider.title) API key", text: $key)
+                .textFieldStyle(.roundedBorder)
+            Button(saved ? "Saved" : "Save") {
+                Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: provider.keychainAccount)
+                key = ""
+                saved = true
+                onSaved()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { saved = false }
+            }
+            .disabled(key.isEmpty)
+            .actionButton(prominent: true)
+        }
     }
 }
 
@@ -307,7 +342,7 @@ struct DictionarySettings: View {
                 .frame(minHeight: 240)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
             HStack {
-                Text("\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
+                Text(settings.vocabulary.terms.count == 1 ? "1 term" : "\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Reset to Default") {
                     settings.vocabularyText = Vocabulary.defaultText
@@ -327,6 +362,8 @@ struct PrivacySettings: View {
             Section("Cleanup") {
                 Toggle("Clean up transcripts", isOn: $settings.cleanupEnabled)
                 Text("Removes ums and uhs, fixes capitalisation and punctuation, and turns \"new paragraph\" into a line break. This is done with rules on this Mac; your text is never sent anywhere for cleanup. Turn it off to keep transcripts exactly as the model heard them.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Adapts to the app in front: terminals and editors get it as spoken, chats skip the final period.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("History") {
@@ -364,13 +401,13 @@ struct AboutSettings: View {
                 Button(checker.isChecking ? "Checking…" : "Check for Updates") { checker.check(userInitiated: true) }
                     .disabled(checker.isChecking)
                     .actionButton(prominent: true)
-                Button("Source Code") { NSWorkspace.shared.open(Welcome.repoURL) }
+                Button("Source Code") { Welcome.openInBackground(Welcome.repoURL) }
                     .actionButton()
-                Button("@imjaredz") { NSWorkspace.shared.open(Welcome.authorURL) }
+                Button("@imjaredz") { Welcome.openInBackground(Welcome.authorURL) }
                     .actionButton()
             }
             .padding(.top, 8)
-            Button("Built with Devin") { NSWorkspace.shared.open(Welcome.devinURL) }
+            Button("Built with Devin") { Welcome.openInBackground(Welcome.devinURL) }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .font(.callout)
@@ -379,56 +416,86 @@ struct AboutSettings: View {
     }
 }
 
-/// Click, then press the key (or hold a modifier) you want.
+/// Click, then press the key combo (or hold a modifier) you want.
 struct HotkeyRecorder: View {
     @Binding var hotkey: Hotkey
     @State private var recording = false
+    @State private var held: UInt = 0
+    @State private var hint: String?
+    @State private var tap: KeyTap?
     @State private var monitor: Any?
 
     var body: some View {
-        HStack {
-            Text("Hold to talk")
-            Spacer()
-            Button(recording ? "Press a key…" : hotkey.displayName) { recording ? stop() : begin() }
-                .frame(minWidth: 120)
-                .actionButton(prominent: recording)
-            Menu("Presets") {
-                Button("Fn") { hotkey = .fn }
-                Button("Right ⌥") { hotkey = .rightOption }
-                Button("Right ⌘") { hotkey = .rightCommand }
+        VStack(alignment: .trailing, spacing: 4) {
+            HStack {
+                Text("Hold to talk")
+                Spacer()
+                Button(label) { recording ? stop() : begin() }
+                    .frame(minWidth: 120)
+                    .actionButton(prominent: recording)
+                Menu("Presets") {
+                    Button("Fn") { hotkey = .fn }
+                    Button("Right ⌥") { hotkey = .rightOption }
+                    Button("Right ⌘") { hotkey = .rightCommand }
+                }
+                .frame(width: 90)
             }
-            .frame(width: 90)
+            if let hint {
+                Text(hint).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
+    private var label: String {
+        guard recording else { return hotkey.displayName }
+        return held == 0 ? "Press a key…" : Hotkey.symbols(for: held) + "…"
+    }
+
+    /// Through the event tap when Accessibility is granted, so combos macOS claims (⌃Space, ⌘Space) still reach us;
+    /// otherwise a local monitor, which only sees what the system lets through to the window.
     private func begin() {
         recording = true
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
-            if event.type == .flagsChanged {
-                guard Hotkey.modifierKeyCodes[event.keyCode] != nil,
-                      !event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty else { return nil }
-                let flag: NSEvent.ModifierFlags
-                switch event.keyCode {
-                case 63: flag = .function
-                case 54, 55: flag = .command
-                case 58, 61: flag = .option
-                case 59, 62: flag = .control
-                case 56, 60: flag = .shift
-                default: flag = .capsLock
-                }
-                hotkey = Hotkey(keyCode: event.keyCode, modifiers: flag.rawValue)
-            } else {
-                if event.keyCode == 53 { stop(); return nil }
-                let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
-                hotkey = Hotkey(keyCode: event.keyCode, modifiers: flags.rawValue)
+        held = 0
+        hint = nil
+        DictationController.shared.hotkeyPaused = true
+        var state = HotkeyRecording()
+        var swallowUp: UInt16?  // the committed key's key-up, so e.g. ⌘Space doesn't still open Spotlight
+        let handle: (NSEvent) -> Bool = { event in
+            if event.type == .keyUp {
+                guard event.keyCode == swallowUp else { return false }
+                stop()
+                return true
             }
-            stop()
-            return nil
+            let input: HotkeyRecording.Event = event.type == .flagsChanged
+                ? .flagsChanged(keyCode: event.keyCode, flags: event.modifierFlags.rawValue)
+                : .keyDown(keyCode: event.keyCode, flags: event.modifierFlags.rawValue)
+            switch state.handle(input) {
+            case let .recording(modifiers):
+                held = modifiers
+            case let .committed(key):
+                hotkey = key
+                if key.isUsedBySystem { hint = "\(key.displayName) is also a macOS shortcut; Local Flow takes it over while running." }
+                recording = false
+                held = 0
+                swallowUp = key.isModifierOnly ? nil : key.keyCode
+                if swallowUp == nil { stop() }
+            case .cancelled:
+                stop()
+            }
+            return event.type != .flagsChanged
+        }
+        tap = KeyTap(handler: handle)
+        if tap == nil {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp, .flagsChanged]) { handle($0) ? nil : $0 }
         }
     }
 
     private func stop() {
         recording = false
+        held = 0
+        DictationController.shared.hotkeyPaused = false
+        tap?.stop()
+        tap = nil
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
     }

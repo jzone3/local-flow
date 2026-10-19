@@ -359,10 +359,12 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
     /// Deferred a turn so an alert chosen from another sheet's completion handler lands after that sheet has gone.
     private func present(_ alert: NSAlert, completion: ((NSApplication.ModalResponse) -> Void)? = nil) {
         DispatchQueue.main.async {
-            if let window = NSApp.keyWindow, window.attachedSheet == nil {
+            if let window = NSApp.keyWindow, window.isVisible, window.attachedSheet == nil {
                 alert.beginSheetModal(for: window) { completion?($0) }
             } else {
-                completion?(alert.runModal())
+                // With no window up (menu bar item, launch check) `runModal()` never shows the panel in this
+                // accessory app, so the alert hangs off the Settings window instead.
+                alert.beginSheetModal(for: WindowManager.shared.showSettings()) { completion?($0) }
             }
         }
     }

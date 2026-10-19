@@ -40,20 +40,14 @@ struct ActionButton: ViewModifier {
     }
 }
 
-/// The faintly tinted backdrop System Settings and Finder use (`underWindowBackground`): opaque enough to read,
-/// still picks up a hint of the desktop colour. Used behind every content window; the bar keeps its real glass.
-struct WindowMaterial: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .underWindowBackground
-        view.blendingMode = .behindWindow
-        view.state = .followsWindowActiveState
-        return view
-    }
-
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+/// Fixed off-white (#F5F5F7, #1C1C1E in dark mode) behind every content window: no effect view, no tint from the
+/// desktop, so the windows look the same on every wallpaper. The bar keeps its real glass.
+private let windowBackground = NSColor(name: nil) { appearance in
+    appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? NSColor(srgbRed: 0.11, green: 0.11, blue: 0.12, alpha: 1)
+        : NSColor(srgbRed: 0.961, green: 0.961, blue: 0.965, alpha: 1)
 }
 
 extension View {
-    func windowMaterial() -> some View { background(WindowMaterial().ignoresSafeArea()) }
+    func windowMaterial() -> some View { background(Color(nsColor: windowBackground).ignoresSafeArea()) }
 }

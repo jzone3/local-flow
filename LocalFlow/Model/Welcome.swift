@@ -16,6 +16,7 @@ enum Welcome {
 
         let host = NSHostingController(rootView: WelcomeView().windowMaterial())
         host.sizingOptions = [.preferredContentSize]
+        host.safeAreaRegions = []  // hidden title bar: no safe-area inset, so the content is padded evenly
         let sheet = NSWindow(contentViewController: host)
         sheet.setContentSize(host.view.fittingSize)
         sheet.styleMask = [.titled, .fullSizeContentView]
@@ -26,17 +27,33 @@ enum Welcome {
         sheet.center()
         NSApp.runModal(for: sheet)
         sheet.orderOut(nil)
-        openInBackground(authorURL)
         next()
+        openInBackground(authorURL)
     }
 
     static func dismiss() { NSApp.stopModal() }
 
-    /// Opens the URL without bringing the browser in front of the app.
+    /// Opens the URL behind the app. A browser that has to launch first comes to the front anyway
+    /// (`activates = false` only covers a running one), so the app takes the front back when that happens.
     static func openInBackground(_ url: URL) {
         let config = NSWorkspace.OpenConfiguration()
         config.activates = false
+        let center = NSWorkspace.shared.notificationCenter
+        var token: NSObjectProtocol?
+        token = center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app != .current else { return }
+            comeBackToFront()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { token.map(center.removeObserver) }
         NSWorkspace.shared.open(url, configuration: config)
+    }
+
+    @MainActor
+    private static func comeBackToFront() {
+        guard let window = NSApp.keyWindow ?? NSApp.windows.last(where: { $0.isVisible && $0.canBecomeKey }) else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
     }
 }
 
@@ -52,15 +69,19 @@ private struct WelcomeView: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 12)
-            Text("I built this with Devin, Cognition's AI software engineer. The whole thing is open source.")
+            Text("You speak faster than you type. Local Flow keeps all voice dictation private. Nobody will train on your data, and all transcription runs locally.")
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 10)
+            Text("Built with Devin by Cognition. Open source.")
+                .font(.system(size: 12))
+                .foregroundStyle(.tertiary)
                 .padding(.bottom, 28)
             HStack(spacing: 12) {
-                Button("Source Code") { NSWorkspace.shared.open(Welcome.repoURL) }
+                Button("Source Code") { Welcome.openInBackground(Welcome.repoURL) }
                     .actionButton()
                 Button("Get Started") { Welcome.dismiss() }
                     .actionButton(prominent: true)
@@ -69,7 +90,7 @@ private struct WelcomeView: View {
             .controlSize(.large)
         }
         .padding(.horizontal, 36)
-        .padding(.top, 30)
+        .padding(.top, 22)  // the icon artwork has its own margin; this reads as even with the 28 below
         .padding(.bottom, 28)
         .frame(width: 400)
         .overlay(alignment: .topLeading) {
@@ -77,7 +98,6 @@ private struct WelcomeView: View {
                 .padding(.leading, 16)
                 .padding(.top, 14)
         }
-        .ignoresSafeArea(.container, edges: .top)
     }
 
 }
@@ -88,7 +108,7 @@ private struct TryDevinLink: View {
 
     var body: some View {
         Button {
-            NSWorkspace.shared.open(Welcome.devinURL)
+            Welcome.openInBackground(Welcome.devinURL)
         } label: {
             Text("Try Devin \u{2197}")
                 .font(.system(size: 11.5, weight: .medium))
