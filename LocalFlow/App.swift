@@ -42,6 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.setActivationPolicy(.accessory)
         _ = HistoryStore.shared
+        WhisperModel.removeRetiredFiles()
         DictationController.shared.start()
         Welcome.showIfNeeded {
             if AppSettings.shared.onboardingDone {

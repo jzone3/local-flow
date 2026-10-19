@@ -35,7 +35,7 @@ final class AppSettings: ObservableObject {
         engineMode = EngineMode(rawValue: defaults.string(forKey: "engineMode") ?? "") ?? .local
         cloudProviderID = defaults.string(forKey: "cloudProvider") ?? CloudProviderID.openAI.rawValue
         cloudModels = defaults.dictionary(forKey: "cloudModels") as? [String: String] ?? [:]
-        localModelID = defaults.string(forKey: "localModel") ?? WhisperModel.recommended.id
+        localModelID = WhisperModel.named(defaults.string(forKey: "localModel") ?? WhisperModel.recommended.id).id
         fallbackToLocal = defaults.object(forKey: "fallbackToLocal") as? Bool ?? true
         mixtureOfExperts = defaults.bool(forKey: "mixtureOfExperts")
         cleanupEnabled = defaults.object(forKey: "cleanupEnabled") as? Bool ?? true
