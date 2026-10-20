@@ -99,13 +99,12 @@ private struct HistoryRow: View {
             } else {
                 Text(entry.text).textSelection(.enabled)
             }
+            if let source = entry.source {
+                Label { Text(source).lineLimit(1).truncationMode(.middle) } icon: { Icon("text-lines", size: 11) }
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             HStack(spacing: 8) {
                 Text(entry.date, style: .relative) + Text(" ago")
-                if let source = entry.source {
-                    Text("·")
-                    Label { Text(source).lineLimit(1).truncationMode(.middle) } icon: { Icon("text-lines", size: 11) }
-                        .frame(maxWidth: 180, alignment: .leading)
-                }
                 if !entry.failed {
                     Text("·")
                     Text(entry.engine)
@@ -114,7 +113,8 @@ private struct HistoryRow: View {
                 Text(String(format: "%.0fs", entry.durationSeconds))
                 Spacer()
                 if entry.audioFileName != nil {
-                    Button(entry.failed ? "Retry" : "Retry → clipboard") { controller.retry(entry) }
+                    Button("Retry") { controller.retry(entry) }
+                        .help(entry.failed ? "Transcribe this recording again" : "Transcribe again; the result goes to the clipboard")
                         .disabled(controller.state.isActive)
                 }
                 if !entry.failed {
@@ -132,6 +132,7 @@ private struct HistoryRow: View {
                 }
             }
             .font(.caption).foregroundStyle(.secondary)
+            .lineLimit(1)
             .actionButton()
             .controlSize(.small)
             if let details = entry.details {
