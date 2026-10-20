@@ -72,9 +72,11 @@ final class HistoryStore: ObservableObject {
         save()
     }
 
+    /// Replaces an entry; the list stays newest-first, so a re-dated (retried) entry moves to the top.
     func update(_ entry: HistoryEntry) {
-        guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
-        entries[index] = entry
+        guard entries.contains(where: { $0.id == entry.id }) else { return }
+        entries.removeAll { $0.id == entry.id }
+        entries.insert(entry, at: entries.firstIndex { $0.date < entry.date } ?? entries.endIndex)
         save()
     }
 

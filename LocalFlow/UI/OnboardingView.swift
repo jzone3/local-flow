@@ -303,6 +303,7 @@ struct OnboardingView: View {
     @State private var fnConflict = Hotkey.systemDictationUsesFnTwice
     @State private var tryText = ""
     @State private var sawHotkey = false
+    @FocusState private var tryFocused: Bool
 
     /// Anything that can turn speech into text yet? Otherwise the test box would ask the user to talk into nothing.
     private var canTranscribe: Bool {
@@ -317,6 +318,14 @@ struct OnboardingView: View {
             VStack(spacing: 8) {
                 TextField(canTranscribe ? "Say “I talk faster than I type.”" : "No model downloaded yet", text: $tryText, axis: .vertical)
                     .textFieldStyle(.plain)
+                    .focused($tryFocused)
+                    .onAppear {
+                        // Focus the box for them: holding the hotkey should type here without a click first.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            WindowManager.shared.bringToFront("onboarding")
+                            tryFocused = true
+                        }
+                    }
                     .font(.system(size: 15))
                     .lineLimit(2...3)
                     .padding(.horizontal, 14)
