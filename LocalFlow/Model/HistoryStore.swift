@@ -4,7 +4,7 @@ import Foundation
 
 struct HistoryEntry: Codable, Identifiable, Equatable {
     let id: UUID
-    let date: Date
+    var date: Date
     var text: String
     var rawText: String
     var engine: String

@@ -108,7 +108,11 @@ struct DictationBarView: View {
             }
         case .done:
             HStack(spacing: 10) {
-                Icon("warning", size: 16).foregroundStyle(.orange)
+                if controller.lastWarning == nil || controller.lastWarning == DictationController.copiedMessage {
+                    Icon("check-circle", size: 16).foregroundStyle(.green)
+                } else {
+                    Icon("warning", size: 16).foregroundStyle(.orange)
+                }
                 Text(controller.lastWarning ?? "Pasted").font(.system(size: 13)).lineLimit(1).truncationMode(.tail)
             }
         case .failed(let message):

@@ -40,6 +40,7 @@ final class DictationController: ObservableObject {
     private var ignoreNextRelease = false
     private let tapMaxHold: TimeInterval = 0.3
     private let doubleTapWindow: TimeInterval = 0.5
+    static let copiedMessage = "Copied to the clipboard."
     private static let microphoneOff = "Microphone access is off. Turn it on in System Settings → Privacy & Security → Microphone."
 
     var statusLine: String {
@@ -228,10 +229,11 @@ final class DictationController: ObservableObject {
                 updated.engine = outcome.engine
                 updated.details = outcome.details
                 updated.error = nil
+                updated.date = Date()  // a retried dictation is the newest thing that happened
                 HistoryStore.shared.update(updated)
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(outcome.text, forType: .string)
-                lastWarning = "Copied to the clipboard."
+                lastWarning = Self.copiedMessage
                 state = .done
                 scheduleHide(after: 2.5)
             } catch {

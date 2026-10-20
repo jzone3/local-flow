@@ -84,8 +84,10 @@ private struct HistoryRow: View {
             }
             HStack(spacing: 8) {
                 Text(entry.date, style: .relative) + Text(" ago")
-                Text("·")
-                Text(entry.engine)
+                if !entry.failed {
+                    Text("·")
+                    Text(entry.engine)
+                }
                 Text("·")
                 Text(String(format: "%.0fs", entry.durationSeconds))
                 Spacer()
