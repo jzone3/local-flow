@@ -5,8 +5,9 @@ import Security
 ///
 /// Items go to the data-protection keychain (`kSecUseDataProtectionKeychain`): it is tied to the app identifier, not to
 /// the code signature, so a re-signed build (dev → release, new certificate) reads its keys without macOS asking for the
-/// login keychain password. That store needs the `keychain-access-groups` entitlement with a team prefix, which only a
-/// Developer ID build has; ad-hoc dev builds get `errSecMissingEntitlement` and fall back to the legacy login keychain.
+/// login keychain password. That store needs the `keychain-access-groups` entitlement with a team prefix, which the
+/// release workflow applies from LocalFlow.release.entitlements; ad-hoc dev builds get `errSecMissingEntitlement` and
+/// fall back to the legacy login keychain.
 ///
 /// Legacy items are read with keychain UI switched off: an item written by a differently signed copy of the app would
 /// otherwise pop the "Local Flow wants to access key…" password sheet. Such an item is treated as absent instead, and
