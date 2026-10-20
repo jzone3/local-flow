@@ -12,6 +12,10 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
     var audioFileName: String?
     /// Added later; entries written by older builds decode without it.
     var details: TranscriptionDetails?
+    /// Set when the dictation failed: the recording is kept so it can be retried; `text` is empty.
+    var error: String?
+
+    var failed: Bool { error != nil }
 }
 
 /// Transcripts and their recordings: kept only on this Mac, only while the app is running (wiped on quit and on
@@ -65,6 +69,12 @@ final class HistoryStore: ObservableObject {
 
     func add(_ entry: HistoryEntry) {
         entries.insert(entry, at: 0)
+        save()
+    }
+
+    func update(_ entry: HistoryEntry) {
+        guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
+        entries[index] = entry
         save()
     }
 

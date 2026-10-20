@@ -14,6 +14,14 @@ struct WhisperModel: Identifiable, Equatable {
     let url: URL?
     let isCustom: Bool
 
+    /// The whisper.cpp name without the ggml-/.bin wrapping ("large-v3-turbo-q5_0"), for people who know the models.
+    var shortName: String {
+        var name = fileName
+        if name.hasPrefix("ggml-") { name.removeFirst(5) }
+        if name.hasSuffix(".bin") { name.removeLast(4) }
+        return name
+    }
+
     private init(id: String, title: String, file: String, detail: String, bytes: Int64) {
         self.id = id
         self.title = title

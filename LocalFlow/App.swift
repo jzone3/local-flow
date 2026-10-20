@@ -16,7 +16,9 @@ struct LocalFlowApp: App {
                 .keyboardShortcut(",")
             Button("History…") { WindowManager.shared.showHistory() }
             Button("Last Transcript…") { WindowManager.shared.showLastTranscript() }
-                .disabled(history.entries.isEmpty)
+                .disabled(history.entries.isEmpty || controller.lastEntry?.failed == true)
+            Button("Retry Last Dictation") { controller.retryLast() }
+                .disabled(controller.lastEntry?.audioFileName == nil || controller.state.isActive)
             Divider()
             Button("Check for Updates…") { UpdateChecker.shared.check(userInitiated: true) }
             Button("Run Setup Again…") { WindowManager.shared.showOnboarding() }

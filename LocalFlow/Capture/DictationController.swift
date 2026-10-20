@@ -170,8 +170,8 @@ final class DictationController: ObservableObject {
                 guard !Task.isCancelled else { return }
                 lastWarning = outcome.warning.map(Self.friendly)
                 if TextCleanup.isHallucination(outcome.text) {
+                    keepFailed(entryID, audioURL: audioURL, duration: duration, engine: outcome.engine, error: "Didn't catch anything.", details: outcome.details)
                     show(failure: "Didn't catch anything.")
-                    try? FileManager.default.removeItem(at: audioURL)
                     return
                 }
                 HistoryStore.shared.add(HistoryEntry(id: entryID, date: Date(), text: outcome.text, rawText: outcome.rawText,
@@ -188,10 +188,65 @@ final class DictationController: ObservableObject {
                 }
             } catch {
                 guard !Task.isCancelled else { return }
-                try? FileManager.default.removeItem(at: audioURL)
+                keepFailed(entryID, audioURL: audioURL, duration: duration, engine: settings.engineLine, error: Self.friendly(error.localizedDescription), details: nil)
                 show(failure: error.localizedDescription)
             }
         }
+    }
+
+    /// A failed dictation stays in History with its recording, so it can be played back or retried.
+    private func keepFailed(_ id: UUID, audioURL: URL, duration: Double, engine: String, error: String, details: TranscriptionDetails?) {
+        HistoryStore.shared.add(HistoryEntry(id: id, date: Date(), text: "", rawText: "", engine: engine, durationSeconds: duration,
+                                             audioFileName: audioURL.lastPathComponent, details: details, error: error))
+    }
+
+    /// Transcribes a history entry's recording again (the menu's "Retry Last Dictation" and the Retry button in
+    /// History). The text goes to the clipboard, not to the app in front: the cursor has long moved on.
+    func retry(_ entry: HistoryEntry) {
+        guard !state.isActive, let url = HistoryStore.shared.audioURL(for: entry),
+              let data = try? Data(contentsOf: url), let samples = AudioRecorder.samples(fromWAV: data) else {
+            show(failure: "The recording is gone.")
+            return
+        }
+        transcribingText = TranscriptionService.transcribingLabel()
+        state = .transcribing
+        bar.show()
+        transcription = Task { [weak self] in
+            guard let self else { return }
+            var updated = entry
+            do {
+                let outcome = try await TranscriptionService().transcribe(samples: samples, profile: .standard)
+                guard !Task.isCancelled else { return }
+                if TextCleanup.isHallucination(outcome.text) {
+                    updated.error = "Didn't catch anything."
+                    HistoryStore.shared.update(updated)
+                    show(failure: "Didn't catch anything.")
+                    return
+                }
+                updated.text = outcome.text
+                updated.rawText = outcome.rawText
+                updated.engine = outcome.engine
+                updated.details = outcome.details
+                updated.error = nil
+                HistoryStore.shared.update(updated)
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(outcome.text, forType: .string)
+                lastWarning = "Copied to the clipboard."
+                state = .done
+                scheduleHide(after: 2.5)
+            } catch {
+                guard !Task.isCancelled else { return }
+                updated.error = Self.friendly(error.localizedDescription)
+                HistoryStore.shared.update(updated)
+                show(failure: error.localizedDescription)
+            }
+        }
+    }
+
+    var lastEntry: HistoryEntry? { HistoryStore.shared.entries.max { $0.date < $1.date } }
+
+    func retryLast() {
+        if let entry = lastEntry { retry(entry) }
     }
 
     /// The app the text will land in is the one in front: Local Flow is an accessory app and never takes that spot.
