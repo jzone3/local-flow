@@ -64,11 +64,7 @@ struct OnboardingView: View {
                 }
                 Spacer()
                 if current == .cloudIntro {
-                    Button("Not now") { wantsCloud = false; step += 1 }
-                        .actionButton()
-                    Button("Set up cloud") { wantsCloud = true; step += 1 }
-                        .actionButton(prominent: true)
-                        .keyboardShortcut(.defaultAction)
+                    EmptyView()  // the choice sits on the page; two footer buttons would run into the dots
                 } else if step < stepCount - 1 {
                     Button(current == .cloudKeys && settings.cloudProvidersWithKeys.isEmpty ? "Skip" : "Continue") { step += 1 }
                         .actionButton(prominent: true)
@@ -229,6 +225,13 @@ struct OnboardingView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(16)
             .card(cornerRadius: 12)
+            HStack(spacing: 12) {
+                Button("Not now") { wantsCloud = false; step += 1 }
+                    .actionButton()
+                Button("Set up cloud") { wantsCloud = true; step += 1 }
+                    .actionButton(prominent: true)
+                    .keyboardShortcut(.defaultAction)
+            }
         }
     }
 
