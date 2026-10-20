@@ -50,6 +50,14 @@ struct WhisperModel: Identifiable, Equatable {
     /// Built-ins first, then custom models in the order they were added.
     static var allIncludingCustom: [WhisperModel] { all + custom }
 
+    /// The model dictation actually uses: the selected one, or — if that isn't on disk (defaults reset, file deleted) —
+    /// the first downloaded one, so having a model never fails for the sake of a stale selection.
+    static var active: WhisperModel {
+        let selected = named(AppSettings.shared.localModelID)
+        if selected.isDownloaded { return selected }
+        return allIncludingCustom.first { $0.isDownloaded } ?? selected
+    }
+
     /// Older builds stored other model IDs; those map to the nearest tier.
     static func named(_ id: String) -> WhisperModel {
         allIncludingCustom.first { $0.id == id } ?? (["large-v3", "medium.en", "medium"].contains(id) ? recommended : id.hasPrefix("small") || id.hasPrefix("base") ? all[2] : recommended)
@@ -277,7 +285,7 @@ final class LocalWhisper: TranscriptionProvider {
 
     /// Loads the selected model ahead of time so the first dictation doesn't pay the load cost.
     func preload() {
-        let model = WhisperModel.named(AppSettings.shared.localModelID)
+        let model = WhisperModel.active
         guard model.isDownloaded else { return }
         queue.async { _ = try? self.loadedContext(for: model) }
     }
@@ -299,7 +307,7 @@ final class LocalWhisper: TranscriptionProvider {
     }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionResult {
-        let model = WhisperModel.named(AppSettings.shared.localModelID)
+        let model = WhisperModel.active
         let engine = "Whisper \(model.title) (local)"
         // Decided before queueing: a preload still running on the queue also counts as "loading".
         let needsLoad = !isReady(model)

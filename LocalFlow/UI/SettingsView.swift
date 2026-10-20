@@ -124,21 +124,8 @@ struct CloudSettings: View {
                                                set: { settings.setCloudModel($0, for: provider) })) {
                 ForEach(provider.models, id: \.id) { Text($0.title).tag($0.id) }
             }
-            ProviderKeyField(provider: provider) { keyChanged += 1 }
-                .id(provider.rawValue)
-            HStack {
-                if provider.apiKey != nil {
-                    Label { Text("Key stored in your Keychain") } icon: { Icon("check-circle", size: 14) }.foregroundStyle(.green)
-                    Button("Remove") { Keychain.delete(provider.keychainAccount); keyChanged += 1 }
-                        .actionButton().controlSize(.small)
-                } else {
-                    Label { Text("No key saved") } icon: { Icon("key", size: 14) }.foregroundStyle(.secondary)
-                }
-                Spacer()
-                Link("Get a key", destination: provider.keyURL)
-            }
-            .font(.caption)
-            EnvironmentKeyPicker(provider: provider) { keyChanged += 1 }
+            ProviderKeyRow(provider: provider, found: EnvironmentKeys.scan().first { provider.environmentVariables.contains($0.name) },
+                           showsRemove: true) { keyChanged += 1 }
                 .id("\(provider.rawValue)-\(keyChanged)")
         }
         Section {
@@ -182,7 +169,7 @@ struct WhatGetsSent: View {
     }
 
     private var fallbackLine: String {
-        let model = WhisperModel.named(settings.localModelID)
+        let model = WhisperModel.active
         guard settings.fallbackToLocal else { return "If the cloud fails, nothing is pasted (local fallback is off)." }
         return model.isDownloaded
             ? "If the cloud fails, Whisper \(model.title) on this Mac transcribes instead."
@@ -209,64 +196,76 @@ struct MixtureOfExpertsToggle: View {
     }
 }
 
-/// SecureField + Save for one provider's key. Shared by Settings and the setup flow.
-struct ProviderKeyField: View {
+/// One provider's key: a green check + Replace once a key is saved, otherwise a paste field — or, when the key is
+/// already in a shell file, an "Import from shell" button. Shared by Settings and the setup flow.
+struct ProviderKeyRow: View {
     let provider: CloudProviderID
-    var onSaved: () -> Void = {}
+    var found: EnvironmentKeys.Found?
+    var showsRemove = false
+    var onChange: () -> Void = {}
     @State private var key = ""
-    @State private var saved = false
+    @State private var editing = false
+
+    private var hasKey: Bool { provider.apiKey != nil }
 
     var body: some View {
-        HStack {
-            SecureField("\(provider.title) API key", text: $key)
-                .textFieldStyle(.roundedBorder)
-            Button(saved ? "Saved" : "Save") {
-                Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: provider.keychainAccount)
-                AppSettings.shared.preferProviderWithKey()
-                key = ""
-                saved = true
-                onSaved()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { saved = false }
-            }
-            .disabled(key.isEmpty)
-            .actionButton(prominent: true)
-        }
-    }
-}
-
-/// Offers keys found in the shell environment for the selected provider. The scan happens in `init` because
-/// `onAppear` never fires on an empty `ForEach`; the parent re-creates the view (`.id`) when the key or provider changes.
-struct EnvironmentKeyPicker: View {
-    let provider: CloudProviderID
-    var onUse: () -> Void
-    @State private var found: [EnvironmentKeys.Found]
-
-    init(provider: CloudProviderID, onUse: @escaping () -> Void = {}) {
-        self.provider = provider
-        self.onUse = onUse
-        _found = State(initialValue: Self.scan(for: provider))
-    }
-
-    var body: some View {
-        ForEach(found, id: \.name) { item in
-            HStack {
-                Text("Found \(item.name) in \(item.source) (\(EnvironmentKeys.masked(item.value)))").font(.caption)
-                Spacer()
-                Button("Use it") {
-                    Keychain.set(item.value, for: provider.keychainAccount)
-                    AppSettings.shared.preferProviderWithKey()
-                    found = []
-                    onUse()
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                if hasKey {
+                    Icon("check-circle", size: 16).foregroundStyle(.green)
+                } else if found != nil {
+                    Icon("key", size: 16).foregroundStyle(.secondary)
+                } else {
+                    Icon("x-circle", size: 16).foregroundStyle(.tertiary)
                 }
-                    .actionButton().controlSize(.small)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(provider.title)
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if hasKey, !editing {
+                    if showsRemove {
+                        Button("Remove") { Keychain.delete(provider.keychainAccount); onChange() }.actionButton().controlSize(.small)
+                    }
+                    Button("Replace") { editing = true }.actionButton().controlSize(.small)
+                } else if !hasKey, let found {
+                    Button("Import from shell") { save(found.value) }.actionButton(prominent: true).controlSize(.small)
+                    if !editing {
+                        Button("Paste instead") { editing = true }.actionButton().controlSize(.small)
+                    }
+                } else if !hasKey, !editing {
+                    Link("Get a key", destination: provider.keyURL).font(.caption)
+                }
+            }
+            if editing || (!hasKey && found == nil) {
+                HStack {
+                    SecureField("Paste your \(provider.title) API key", text: $key)
+                        .textFieldStyle(.roundedBorder)
+                    Button("Save") { save(key) }
+                        .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .actionButton(prominent: true)
+                    if editing {
+                        Button("Cancel") { editing = false; key = "" }.actionButton()
+                    }
+                }
             }
         }
     }
 
-    private static func scan(for provider: CloudProviderID) -> [EnvironmentKeys.Found] {
-        guard provider.apiKey == nil else { return [] }
-        let names = provider.environmentVariables
-        return EnvironmentKeys.scan().filter { names.contains($0.name) }
+    private var detail: String {
+        if hasKey { return "Saved in your Keychain" }
+        if let found { return "Found \(found.name) in \(found.source) (\(EnvironmentKeys.masked(found.value)))" }
+        return "No key"
+    }
+
+    private func save(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        Keychain.set(trimmed, for: provider.keychainAccount)
+        AppSettings.shared.preferProviderWithKey()
+        key = ""
+        editing = false
+        onChange()
     }
 }
 
@@ -629,7 +628,6 @@ struct PrivacySettings: View {
                     Text("\(history.entries.count) items this session")
                     Spacer()
                     Button("Show History") { WindowManager.shared.showHistory() }
-                    Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([history.directory]) }
                     Button("Delete All Now", role: .destructive) { history.clear() }
                 }
                 .actionButton()

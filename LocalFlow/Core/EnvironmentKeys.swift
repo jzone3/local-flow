@@ -1,7 +1,8 @@
 import Foundation
 
 /// Finds API keys the user already has on this Mac: the process environment plus `export NAME=value` lines in
-/// the usual shell startup files. Nothing is sent anywhere; the user chooses whether to use what was found.
+/// the usual shell startup files and in the files those `source` (one level, under the home folder only).
+/// Nothing is sent anywhere; the user chooses whether to import what was found.
 enum EnvironmentKeys {
     struct Found: Equatable {
         let name: String
@@ -22,14 +23,47 @@ enum EnvironmentKeys {
                 found.append(Found(name: name, value: value, source: "environment"))
             }
         }
-        for file in shellFiles {
-            let url = home.appendingPathComponent(file)
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
-            for item in parse(text, source: "~/" + file) where seen.insert(item.name).inserted {
+        var files = shellFiles.map { home.appendingPathComponent($0) }
+        var visited = Set<String>()
+        var index = 0
+        while index < files.count {
+            let url = files[index]
+            index += 1
+            guard visited.insert(url.standardizedFileURL.path).inserted,
+                  let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            for item in parse(text, source: display(url, home: home)) where seen.insert(item.name).inserted {
                 found.append(item)
+            }
+            if index <= shellFiles.count {
+                files.append(contentsOf: sourcedFiles(in: text, home: home))
             }
         }
         return found
+    }
+
+    /// Files a startup file loads with `source path` or `. path` (`~`/`$HOME` expanded, relative to home), kept to the
+    /// home folder so a stray line can't make the scan read system files.
+    static func sourcedFiles(in text: String, home: URL) -> [URL] {
+        let pattern = #"^\s*(?:source|\.)\s+["']?([^"'\s;&|]+)["']?\s*(?:#.*)?$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        var out: [URL] = []
+        for line in text.components(separatedBy: .newlines) {
+            guard let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+                  let range = Range(match.range(at: 1), in: line) else { continue }
+            var path = String(line[range])
+            if path.hasPrefix("~/") { path = home.path + path.dropFirst(1) }
+            path = path.replacingOccurrences(of: "${HOME}", with: home.path).replacingOccurrences(of: "$HOME", with: home.path)
+            if path.contains("$") { continue }
+            let url = (path.hasPrefix("/") ? URL(fileURLWithPath: path) : home.appendingPathComponent(path)).standardizedFileURL
+            guard url.path.hasPrefix(home.standardizedFileURL.path + "/") else { continue }
+            out.append(url)
+        }
+        return out
+    }
+
+    static func display(_ url: URL, home: URL) -> String {
+        let path = url.standardizedFileURL.path, root = home.standardizedFileURL.path
+        return path.hasPrefix(root + "/") ? "~" + path.dropFirst(root.count) : path
     }
 
     /// Matches `export NAME=value`, `NAME="value"`, `set -x NAME value` (fish), ignoring commented lines.

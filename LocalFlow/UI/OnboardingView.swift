@@ -1,28 +1,37 @@
 import SwiftUI
 
-/// First-run setup: welcome → permissions → local model → cloud models (optional) → dictionary → done.
+/// First-run setup: welcome → permissions → local model → cloud? → (cloud keys) → dictionary → done.
 struct OnboardingView: View {
     static let windowSize = NSSize(width: 540, height: 600)
+
+    enum Step: Hashable { case welcome, permissions, localModel, cloudIntro, cloudKeys, dictionary, done }
 
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var controller = DictationController.shared
     @ObservedObject private var downloader = ModelDownloader.shared
     @State private var step = 0
-    @State private var foundKeys: [EnvironmentKeys.Found]?  // nil until the user asks to import
+    @State private var wantsCloud = false  // adds the cloud-keys step after "Set up cloud?"
+    @State private var foundKeys: [EnvironmentKeys.Found] = []
     @State private var keyChanged = 0
 
-    private let stepCount = 6
+    private var steps: [Step] {
+        wantsCloud ? [.welcome, .permissions, .localModel, .cloudIntro, .cloudKeys, .dictionary, .done]
+                   : [.welcome, .permissions, .localModel, .cloudIntro, .dictionary, .done]
+    }
+    private var stepCount: Int { steps.count }
+    private var current: Step { steps[min(step, steps.count - 1)] }
 
     var body: some View {
         VStack(spacing: 0) {
             Group {
-                switch step {
-                case 0: welcome
-                case 1: permissions
-                case 2: localModel
-                case 3: cloudModels
-                case 4: dictionary
-                default: done
+                switch current {
+                case .welcome: welcome
+                case .permissions: permissions
+                case .localModel: localModel
+                case .cloudIntro: cloudIntro
+                case .cloudKeys: cloudKeys
+                case .dictionary: dictionary
+                case .done: done
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,14 +63,21 @@ struct OnboardingView: View {
                     Button("Back") { step -= 1 }.actionButton()
                 }
                 Spacer()
-                if step < stepCount - 1 {
-                    Button(step == 3 && settings.engineMode == .local ? "Skip" : "Continue") { step += 1 }
+                if current == .cloudIntro {
+                    Button("Not now") { wantsCloud = false; step += 1 }
+                        .actionButton()
+                    Button("Set up cloud") { wantsCloud = true; step += 1 }
                         .actionButton(prominent: true)
                         .keyboardShortcut(.defaultAction)
-                        .disabled(step == 1 && !hasPermissions)
+                } else if step < stepCount - 1 {
+                    Button(current == .cloudKeys && settings.cloudProvidersWithKeys.isEmpty ? "Skip" : "Continue") { step += 1 }
+                        .actionButton(prominent: true)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(current == .permissions && !hasPermissions)
                 } else {
                     Button("Start Dictating") {
                         settings.onboardingDone = true
+                        if !settings.playSoundsChosen { settings.playSounds = false }
                         LocalWhisper.shared.preload()
                         WindowManager.shared.close("onboarding")
                     }
@@ -196,83 +212,69 @@ struct OnboardingView: View {
         }
     }
 
-    private var cloudModels: some View {
+    private var cloudIntro: some View {
         VStack(spacing: 18) {
-            header("Set up Frontier cloud models", "Optional", icon: "cloud")
-            Text("Cloud models are more accurate for hard audio. Local Flow never saves your audio or transcripts and has no server or database of its own — audio goes straight from your Mac to the provider you pick. The providers may store what you send and use it for training, under their own terms.")
-                .font(.callout).foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            header("Want a cloud option too?", "Optional", icon: "cloud")
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Local Flow also works with cloud speech models (OpenAI, ElevenLabs, Google), which are more accurate on hard audio. You bring your own API keys.")
+                Text("Nothing is stored. Local Flow has no backend: your audio goes straight from this Mac to the provider you pick, with your key. The code is open source, so you can check for yourself. The providers may keep what you send under their own terms.")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(MixtureOfExperts.title).font(.headline)
+                    Text(MixtureOfExperts.explanation)
+                }
+                Text("You can set this up later in Settings → Cloud.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .font(.callout)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(16)
+            .card(cornerRadius: 12)
+        }
+    }
+
+    private var importable: [EnvironmentKeys.Found] {
+        foundKeys.filter { found in provider(for: found).map { $0.apiKey == nil } ?? false }
+    }
+
+    private var cloudKeys: some View {
+        VStack(spacing: 18) {
+            header("Add your API keys", "Keys stay in your Keychain and are only sent to their own provider.", icon: "key")
             Form {
                 Section {
-                    if let foundKeys {
-                        HStack {
-                            Text("Keys found on this Mac").font(.headline)
-                            Spacer()
-                            if foundKeys.filter({ provider(for: $0) != nil }).count > 1 {
-                                Button("Use all") { foundKeys.forEach(use) }.actionButton().controlSize(.small)
-                            }
+                    HStack {
+                        Text("Keys").font(.headline)
+                        Spacer()
+                        if importable.count > 1 {
+                            Button("Import all from shell") { importable.forEach(use) }.actionButton().controlSize(.small)
                         }
-                        Text("Local Flow found these in your shell files. Nothing is used until you click Use.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        ForEach(CloudProviderID.allCases) { provider in
-                            foundKeyRow(provider, found: foundKeys.first { self.provider(for: $0) == provider })
-                        }
-                    } else {
-                        Button("Import API keys from your shell…") { foundKeys = EnvironmentKeys.scan() }
-                            .actionButton()
-                        Text("Looks for OPENAI_API_KEY, ELEVENLABS_API_KEY and GEMINI_API_KEY in your shell files. Nothing is saved until you click Use.")
-                            .font(.caption).foregroundStyle(.secondary)
                     }
-                }
-                Section("Or paste a key") {
                     ForEach(CloudProviderID.allCases) { provider in
-                        ProviderKeyField(provider: provider) { keyChanged += 1 }
+                        ProviderKeyRow(provider: provider, found: foundKeys.first { self.provider(for: $0) == provider }) { keyChanged += 1 }
+                            .id("\(provider.rawValue)-\(keyChanged)")
                     }
+                    Text("Local Flow looks for OPENAI_API_KEY, ELEVENLABS_API_KEY and GEMINI_API_KEY in your shell files (and the files they source). Nothing is saved until you click Import.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
-                Section {
-                    Picker("Mode", selection: $settings.engineMode) {
-                        ForEach(EngineMode.allCases) { Text($0.title).tag($0) }
+                if !settings.cloudProvidersWithKeys.isEmpty {
+                    Section {
+                        Picker("Mode", selection: $settings.engineMode) {
+                            ForEach(EngineMode.allCases) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        if settings.engineMode == .cloud {
+                            MixtureOfExpertsToggle()
+                        }
+                    } header: {
+                        Text("Turn on \(MixtureOfExperts.title)?")
                     }
-                    .pickerStyle(.segmented)
-                    if settings.engineMode == .cloud {
-                        MixtureOfExpertsToggle()
-                    }
+                    .id(keyChanged)
                 }
-                .id(keyChanged)
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
             .padding(.horizontal, -20)
         }
-    }
-
-    private func foundKeyRow(_ provider: CloudProviderID, found: EnvironmentKeys.Found?) -> some View {
-        HStack(spacing: 10) {
-            if provider.apiKey != nil || found != nil {
-                Icon("check-circle", size: 16).foregroundStyle(.green)
-            } else {
-                Icon("x-circle", size: 16).foregroundStyle(.tertiary)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(provider.title)
-                Group {
-                    if provider.apiKey != nil {
-                        Text("Saved in your Keychain")
-                    } else if let found {
-                        Text("Found \(found.name) in \(found.source) (\(EnvironmentKeys.masked(found.value)))")
-                    } else {
-                        Text("Not found")
-                    }
-                }
-                .font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if provider.apiKey == nil, let found {
-                Button("Use") { use(found) }.actionButton().controlSize(.small)
-            }
-        }
-        .id("\(provider.rawValue)-\(keyChanged)")
+        .onAppear { foundKeys = EnvironmentKeys.scan() }
     }
 
     private func provider(for found: EnvironmentKeys.Found) -> CloudProviderID? {
@@ -299,12 +301,18 @@ struct OnboardingView: View {
     @State private var tryText = ""
     @State private var sawHotkey = false
 
+    /// Anything that can turn speech into text yet? Otherwise the test box would ask the user to talk into nothing.
+    private var canTranscribe: Bool {
+        WhisperModel.allIncludingCustom.contains(where: { $0.isDownloaded })
+            || (settings.engineMode == .cloud && settings.cloudProvider.apiKey != nil)
+    }
+
     private var done: some View {
         VStack(spacing: 18) {
             header("You're set", "Hold \(settings.hotkey.displayName) anywhere and talk. Let go to paste.\nDouble-tap it to keep listening hands-free; Esc cancels.", icon: "check-circle")
             KeyboardDemo(hotkey: settings.hotkey, held: controller.state == .listening)
             VStack(spacing: 8) {
-                TextField("Say “I talk faster than I type.”", text: $tryText, axis: .vertical)
+                TextField(canTranscribe ? "Say “I talk faster than I type.”" : "No model downloaded yet", text: $tryText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 15))
                     .lineLimit(2...3)
@@ -328,7 +336,10 @@ struct OnboardingView: View {
                         ProgressView().controlSize(.mini)
                         Text(controller.transcribingText)
                     default:
-                        if sawHotkey {
+                        if !canTranscribe {
+                            Icon("warning", size: 13).foregroundStyle(.orange)
+                            Text("No model yet: go Back and download one, or add a cloud key.")
+                        } else if sawHotkey {
                             Icon("check-circle", size: 13).foregroundStyle(.green)
                             Text(tryText.isEmpty ? "\(settings.hotkey.displayName) works. Try it again in any app." : "That's it. Works the same in any app.")
                         } else {

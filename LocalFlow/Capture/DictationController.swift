@@ -140,19 +140,19 @@ final class DictationController: ObservableObject {
         hotkey.escapeArmed = false
         guard state == .listening else { return }
         let (samples, duration) = recorder.stop()
-        // Needs ~50 ms of samples above the room-noise floor, or Whisper invents a sentence for the silence.
-        let voiced = samples.lazy.filter { abs($0) > 0.02 }.count
-        guard duration > 0.35, voiced >= 800 else {
-            if !AudioRecorder.hasPermission {
-                show(failure: Self.microphoneOff)  // revoked while running: the engine delivers silence
-            } else {
-                state = .idle
-                bar.hide()
-            }
+        // Only an accidental tap is dropped. Quiet audio always goes to the model (a low input level is not silence);
+        // if the model hears nothing, `isHallucination` reports "Didn't catch anything."
+        guard duration > 0.35 else {
+            state = .idle
+            bar.hide()
+            return
+        }
+        if !AudioRecorder.hasPermission {
+            show(failure: Self.microphoneOff)  // revoked while running: the engine delivers silence
             return
         }
         transcribingText = TranscriptionService.transcribingLabel()
-        if settings.engineMode == .local, !LocalWhisper.shared.isReady(WhisperModel.named(settings.localModelID)) {
+        if settings.engineMode == .local, !LocalWhisper.shared.isReady(WhisperModel.active) {
             transcribingText = "Loading model…"  // the local engine confirms via onModelLoading once the context is up
         }
         state = .transcribing

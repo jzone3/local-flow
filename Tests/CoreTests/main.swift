@@ -135,6 +135,27 @@ export OTHER=1
 expect(env.map(\.name) == ["OPENAI_API_KEY", "ELEVENLABS_API_KEY", "GEMINI_API_KEY"], "env names \(env.map(\.name))")
 expect(env.first?.value == "sk-test-1234567890", "env value")
 expect(EnvironmentKeys.masked("sk-test-1234567890") == "sk-t…7890", "mask")
+let home = URL(fileURLWithPath: "/Users/me")
+let sourced = EnvironmentKeys.sourcedFiles(in: """
+source ~/.config/shell/private.env
+. "$HOME/.secrets"   # comment
+source .aliases
+source /etc/profile
+source $OTHER/x
+# source ~/.commented
+export FOO=bar
+""", home: home)
+expect(sourced.map(\.path) == ["/Users/me/.config/shell/private.env", "/Users/me/.secrets", "/Users/me/.aliases"], "sourced files \(sourced.map(\.path))")
+expect(EnvironmentKeys.display(URL(fileURLWithPath: "/Users/me/.config/shell/private.env"), home: home) == "~/.config/shell/private.env", "display path")
+let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("lf-env-\(UUID().uuidString)")
+try! FileManager.default.createDirectory(at: tmp.appendingPathComponent(".config/shell"), withIntermediateDirectories: true)
+try! "source ~/.config/shell/private.env\n".write(to: tmp.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+try! "export GEMINI_API_KEY=AIza-from-private-env-1\nsource ~/.deeper\n".write(to: tmp.appendingPathComponent(".config/shell/private.env"), atomically: true, encoding: .utf8)
+try! "export OPENAI_API_KEY=sk-too-deep-12345\n".write(to: tmp.appendingPathComponent(".deeper"), atomically: true, encoding: .utf8)
+let scanned = EnvironmentKeys.scan(home: tmp, environment: [:])
+expect(scanned.map(\.name) == ["GEMINI_API_KEY"], "scan follows one level of source \(scanned.map(\.name))")
+expect(scanned.first?.source == "~/.config/shell/private.env", "scan source \(scanned.first?.source ?? "")")
+try? FileManager.default.removeItem(at: tmp)
 
 // MixtureOfExperts
 let moe = [MixtureOfExperts.Transcript(service: "OpenAI", text: "I pushed to git hub today."),

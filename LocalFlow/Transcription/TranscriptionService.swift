@@ -44,7 +44,7 @@ final class TranscriptionService {
         let result: TranscriptionResult
         var details: TranscriptionDetails
         let started = Date()
-        let localModel = WhisperModel.named(settings.localModelID)
+        let localModel = WhisperModel.active
         let localName = "Whisper \(localModel.title) (local)"
 
         switch settings.engineMode {
