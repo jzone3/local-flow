@@ -61,6 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 /// Opens the app's few windows (settings, history, setup) as plain NSWindows so they work from a menu bar app.
+/// While one is open the app shows in the Dock (so it can be found again); it goes back to menu-bar-only when the last closes.
 @MainActor
 final class WindowManager {
     static let shared = WindowManager()
@@ -87,6 +88,7 @@ final class WindowManager {
     /// `fixed` windows (setup) have one size and no visible title bar, so the content sits under the traffic lights.
     @discardableResult
     private func show<V: View>(_ key: String, title: String, size: NSSize, fixed: Bool = false, @ViewBuilder content: () -> V) -> NSWindow {
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         if let window = windows[key] {
             window.makeKeyAndOrderFront(nil)
@@ -113,6 +115,7 @@ final class WindowManager {
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
             if key == "history" { HistoryPlayer.shared.stop() }
+            if self?.windows.isEmpty == true { NSApp.setActivationPolicy(.accessory) }
         }
         return window
     }

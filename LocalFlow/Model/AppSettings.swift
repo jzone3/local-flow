@@ -29,7 +29,9 @@ final class AppSettings: ObservableObject {
     @Published var dictionaryPacks: [String] { didSet { defaults.set(dictionaryPacks, forKey: "dictionaryPacks") } }
     @Published var language: String { didSet { defaults.set(language, forKey: "language") } }
     @Published var hotkey: Hotkey { didSet { defaults.set(try? JSONEncoder().encode(hotkey), forKey: "hotkey") } }
+    /// On during setup so the test step is audible; off by default afterwards unless the user turned it on.
     @Published var playSounds: Bool { didSet { defaults.set(playSounds, forKey: "playSounds") } }
+    var playSoundsChosen: Bool { defaults.object(forKey: "playSounds") != nil }
     /// CoreAudio device UID of the microphone to record from; nil = system default.
     @Published var inputDeviceUID: String? { didSet { defaults.set(inputDeviceUID, forKey: "inputDeviceUID") } }
     @Published var onboardingDone: Bool { didSet { defaults.set(onboardingDone, forKey: "onboardingDone") } }
@@ -48,7 +50,7 @@ final class AppSettings: ObservableObject {
         dictionaryPacks = defaults.stringArray(forKey: "dictionaryPacks") ?? []
         language = defaults.string(forKey: "language") ?? "auto"
         hotkey = defaults.data(forKey: "hotkey").flatMap { try? JSONDecoder().decode(Hotkey.self, from: $0) } ?? .fn
-        playSounds = defaults.object(forKey: "playSounds") as? Bool ?? true
+        playSounds = defaults.object(forKey: "playSounds") as? Bool ?? !defaults.bool(forKey: "onboardingDone")
         inputDeviceUID = defaults.string(forKey: "inputDeviceUID")
         onboardingDone = defaults.bool(forKey: "onboardingDone")
     }
