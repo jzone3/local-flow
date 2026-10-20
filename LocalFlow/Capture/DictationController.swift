@@ -152,7 +152,7 @@ final class DictationController: ObservableObject {
             return
         }
         transcribingText = TranscriptionService.transcribingLabel()
-        if settings.engineMode == .local, !LocalWhisper.shared.isReady(WhisperModel.named(settings.localModelID)) {
+        if settings.engineMode == .local, !LocalWhisper.shared.isReady(WhisperModel.active) {
             transcribingText = "Loading model…"  // the local engine confirms via onModelLoading once the context is up
         }
         state = .transcribing

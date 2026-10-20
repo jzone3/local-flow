@@ -169,7 +169,7 @@ struct WhatGetsSent: View {
     }
 
     private var fallbackLine: String {
-        let model = WhisperModel.named(settings.localModelID)
+        let model = WhisperModel.active
         guard settings.fallbackToLocal else { return "If the cloud fails, nothing is pasted (local fallback is off)." }
         return model.isDownloaded
             ? "If the cloud fails, Whisper \(model.title) on this Mac transcribes instead."
