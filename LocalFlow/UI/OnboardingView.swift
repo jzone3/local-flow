@@ -355,7 +355,7 @@ struct OnboardingView: View {
                             Icon("check-circle", size: 13).foregroundStyle(.green)
                             Text(tryText.isEmpty ? "\(settings.hotkey.displayName) works. Try it again in any app." : "That's it. Works the same in any app.")
                         } else {
-                            Text("Click the box, then press and hold \(settings.hotkey.displayName) to check it's working.")
+                            Text("Press and hold \(settings.hotkey.displayName) and say something to check it's working.")
                         }
                     }
                 }
