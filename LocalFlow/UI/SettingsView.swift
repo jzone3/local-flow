@@ -180,6 +180,7 @@ struct ProviderKeyField: View {
                 .textFieldStyle(.roundedBorder)
             Button(saved ? "Saved" : "Save") {
                 Keychain.set(key.trimmingCharacters(in: .whitespacesAndNewlines), for: provider.keychainAccount)
+                AppSettings.shared.preferProviderWithKey()
                 key = ""
                 saved = true
                 onSaved()
@@ -209,7 +210,12 @@ struct EnvironmentKeyPicker: View {
             HStack {
                 Text("Found \(item.name) in \(item.source) (\(EnvironmentKeys.masked(item.value)))").font(.caption)
                 Spacer()
-                Button("Use it") { Keychain.set(item.value, for: provider.keychainAccount); found = []; onUse() }
+                Button("Use it") {
+                    Keychain.set(item.value, for: provider.keychainAccount)
+                    AppSettings.shared.preferProviderWithKey()
+                    found = []
+                    onUse()
+                }
                     .actionButton().controlSize(.small)
             }
         }
@@ -283,7 +289,7 @@ struct ModelList: View {
                             Text(model.title).fontWeight(.semibold)
                             Text(model.sizeText).font(.caption).foregroundStyle(.secondary)
                             if model == WhisperModel.recommended {
-                                Text("Default").font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
+                                Text("Recommended").font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
                                     .padding(.horizontal, 6).padding(.vertical, 2)
                                     .background(Color.accentColor.opacity(0.12), in: Capsule())
                             }
@@ -321,10 +327,20 @@ struct ModelList: View {
             Button("Cancel") { downloader.cancel(model) }.actionButton().controlSize(.small)
         } else if model.isDownloaded {
             Label { Text("Downloaded") } icon: { Icon("check", size: 11) }.font(.caption).foregroundStyle(.green)
-            Button("Delete") { downloader.delete(model) }.actionButton().controlSize(.small)
+            Button("Delete") { confirmDelete(model) }.actionButton().controlSize(.small)
         } else {
             Button("Download") { downloader.download(model) }.actionButton(prominent: true).controlSize(.small)
         }
+    }
+
+    private func confirmDelete(_ model: WhisperModel) {
+        let alert = NSAlert()
+        alert.messageText = "Delete \(model.title) (\(model.sizeText))?"
+        alert.informativeText = "You can download it again any time."
+        alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+        let finish: (NSApplication.ModalResponse) -> Void = { if $0 == .alertFirstButtonReturn { downloader.delete(model) } }
+        if let window = NSApp.keyWindow { alert.beginSheetModal(for: window, completionHandler: finish) } else { finish(alert.runModal()) }
     }
 }
 
@@ -411,6 +427,11 @@ struct AboutSettings: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .font(.callout)
+            Spacer()
+            Button("Remove All Data…") { DataRemoval.confirmAndRemove() }
+                .actionButton()
+                .controlSize(.small)
+                .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -434,9 +455,9 @@ struct HotkeyRecorder: View {
                     .frame(minWidth: 120)
                     .actionButton(prominent: recording)
                 Menu("Presets") {
-                    Button("Fn") { hotkey = .fn }
-                    Button("Right ⌥") { hotkey = .rightOption }
-                    Button("Right ⌘") { hotkey = .rightCommand }
+                    Button("Fn") { choose(.fn) }
+                    Button("Right ⌥") { choose(.rightOption) }
+                    Button("Right ⌘") { choose(.rightCommand) }
                 }
                 .frame(width: 90)
             }
@@ -444,6 +465,11 @@ struct HotkeyRecorder: View {
                 Text(hint).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+
+    private func choose(_ key: Hotkey) {
+        hotkey = key
+        hint = nil
     }
 
     private var label: String {
