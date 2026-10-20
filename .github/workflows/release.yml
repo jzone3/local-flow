@@ -104,14 +104,7 @@ jobs:
             OTHER_CODE_SIGN_FLAGS="--timestamp" \
             | tail -30
           cp -R "$RUNNER_TEMP/app.xcarchive/Products/Applications/$APP_NAME.app" .
-          # Re-sign the app bundle with the release entitlements (adds keychain-access-groups, which Xcode will
-          # not apply without a provisioning profile). Nested frameworks keep their Xcode signatures.
-          sed "s/TEAM_ID/$APPLE_TEAM_ID/" LocalFlow/LocalFlow.release.entitlements > "$RUNNER_TEMP/release.entitlements"
-          codesign --force --options runtime --timestamp \
-            --entitlements "$RUNNER_TEMP/release.entitlements" \
-            --sign "Developer ID Application" "$APP_NAME.app"
           codesign --verify --deep --strict --verbose=2 "$APP_NAME.app"
-          codesign -d --entitlements :- "$APP_NAME.app" | grep -q "$APPLE_TEAM_ID.com.jzone3.LocalFlow"
 
       - name: Notarize app
         env:
