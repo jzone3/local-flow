@@ -434,9 +434,9 @@ struct HotkeyRecorder: View {
                     .frame(minWidth: 120)
                     .actionButton(prominent: recording)
                 Menu("Presets") {
-                    Button("Fn") { hotkey = .fn }
-                    Button("Right ⌥") { hotkey = .rightOption }
-                    Button("Right ⌘") { hotkey = .rightCommand }
+                    Button("Fn") { choose(.fn) }
+                    Button("Right ⌥") { choose(.rightOption) }
+                    Button("Right ⌘") { choose(.rightCommand) }
                 }
                 .frame(width: 90)
             }
@@ -444,6 +444,11 @@ struct HotkeyRecorder: View {
                 Text(hint).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+    }
+
+    private func choose(_ key: Hotkey) {
+        hotkey = key
+        hint = nil
     }
 
     private var label: String {
