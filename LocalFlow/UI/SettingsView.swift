@@ -409,8 +409,11 @@ struct AddCustomModelSheet: View {
     @State private var urlText = ""
     @State private var picked: Candidate?
     @State private var checking = false
-    @State private var problem: String?
+    @State private var urlProblem: String?
+    @State private var fileProblem: String?
     @State private var lookup: Task<Void, Never>?
+
+    private var problem: String? { fileProblem ?? urlProblem }
 
     enum Candidate: Equatable {
         case remote(ModelSource.HuggingFaceFile, bytes: Int64?)
@@ -480,20 +483,23 @@ struct AddCustomModelSheet: View {
         .onDisappear { lookup?.cancel() }
     }
 
+    /// Clearing the field only forgets the link; typing a link replaces a chosen file.
     private func resolve(_ text: String) {
         lookup?.cancel()
-        picked = nil
-        problem = nil
         checking = false
+        urlProblem = nil
+        if case .remote = picked { picked = nil }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        picked = nil
+        fileProblem = nil
         switch ModelSource.parseHuggingFace(trimmed) {
-        case .failure(.notAURL): problem = "That isn't a web address."
-        case .failure(.notHuggingFace): problem = "Only huggingface.co links are supported."
-        case .failure(.notAFile): problem = "That's a repo page, not a file. Open the .bin file and copy its link."
-        case .failure(.notBin): problem = "The link must point to a ggml .bin file."
+        case .failure(.notAURL): urlProblem = "That isn't a web address."
+        case .failure(.notHuggingFace): urlProblem = "Only huggingface.co links are supported."
+        case .failure(.notAFile): urlProblem = "That's a repo page, not a file. Open the .bin file and copy its link."
+        case .failure(.notBin): urlProblem = "The link must point to a ggml .bin file."
         case .success(let file):
-            if let conflict = CustomModelStore.shared.conflict(fileName: file.fileName) { problem = conflict; return }
+            if let conflict = CustomModelStore.shared.conflict(fileName: file.fileName) { urlProblem = conflict; return }
             checking = true
             lookup = Task {
                 let size = await Self.remoteSize(file.downloadURL)
@@ -501,7 +507,7 @@ struct AddCustomModelSheet: View {
                 checking = false
                 switch size {
                 case .success(let bytes): picked = .remote(file, bytes: bytes)
-                case .failure(let message): problem = message
+                case .failure(let message): urlProblem = message
                 }
             }
         }
@@ -533,13 +539,14 @@ struct AddCustomModelSheet: View {
         panel.message = "Pick a Whisper ggml model (.bin)"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         lookup?.cancel()
-        urlText = ""
         checking = false
         picked = nil
-        problem = nil
-        guard url.pathExtension.lowercased() == "bin" else { problem = "The file must be a ggml .bin model."; return }
-        if let conflict = CustomModelStore.shared.conflict(fileName: url.lastPathComponent) { problem = conflict; return }
-        guard ModelSource.isGgmlModel(at: url) else { problem = ModelSource.notWhisperMessage; return }
+        urlProblem = nil
+        urlText = ""   // its onChange only clears link state, so the file result below survives it
+        guard url.pathExtension.lowercased() == "bin" else { fileProblem = "The file must be a ggml .bin model."; return }
+        if let conflict = CustomModelStore.shared.conflict(fileName: url.lastPathComponent) { fileProblem = conflict; return }
+        guard ModelSource.isGgmlModel(at: url) else { fileProblem = ModelSource.notWhisperMessage; return }
+        fileProblem = nil
         let bytes = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
         picked = .local(url, bytes: bytes)
     }
@@ -551,7 +558,11 @@ struct AddCustomModelSheet: View {
         case .remote(let file, let bytes): failure = ModelDownloader.shared.addRemote(file, bytes: bytes ?? 0)
         case .local(let url, _): failure = ModelDownloader.shared.addLocalFile(url)
         }
-        if let failure { problem = failure } else { dismiss() }
+        if let failure {
+            if case .local = picked { fileProblem = failure } else { urlProblem = failure }
+        } else {
+            dismiss()
+        }
     }
 }
 
