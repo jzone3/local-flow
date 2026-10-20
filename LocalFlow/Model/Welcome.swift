@@ -76,7 +76,7 @@ private struct WelcomeView: View {
                 .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 10)
-            Text("Built with Devin by Cognition. Open source.")
+            Text("Built by Devin. Open source.")
                 .font(.system(size: 12))
                 .foregroundStyle(.tertiary)
                 .padding(.bottom, 28)
