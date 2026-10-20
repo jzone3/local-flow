@@ -23,14 +23,23 @@ enum TranscriptionError: LocalizedError {
     case cancelled
     case allFailed(primary: Error, fallback: Error?)
 
-    /// Whether another attempt at the same provider could succeed.
+    /// Whether another attempt at the same provider could succeed. A 429 for an exhausted key is final: retrying
+    /// only delays the fallback (three tries cost ~4.5 s per dictation).
     var isRetryable: Bool {
         switch self {
         case .network: return true
-        case .http(let status, _): return status == 408 || status == 409 || status == 425 || status == 429 || status >= 500
+        case .http(let status, _): return status == 408 || status == 409 || status == 425 || (status == 429 && !isOutOfCredits) || status >= 500
         case .badResponse: return true
         default: return false
         }
+    }
+
+    /// OpenAI: 429 + `insufficient_quota`; other services word it as quota/billing/credits.
+    var isOutOfCredits: Bool {
+        guard case .http(let status, let body) = self, status == 429 || status == 402 else { return false }
+        let text = body.lowercased()
+        return status == 402 || text.contains("insufficient_quota") || text.contains("quota") || text.contains("billing")
+            || text.contains("credit")
     }
 
     var errorDescription: String? {
@@ -46,7 +55,8 @@ enum TranscriptionError: LocalizedError {
                 || body.localizedCaseInsensitiveContains("invalid api key") {
                 return "the API key was rejected"
             }
-            if status == 429 { return "rate limited or out of credits" }
+            if isOutOfCredits { return "the key is out of credits" }
+            if status == 429 { return "rate limited" }
             if status >= 500 { return "the service is down (HTTP \(status))" }
             return "server error \(status)" + (detail.isEmpty ? "" : ": \(detail)")
         case .network(let error):
