@@ -18,6 +18,8 @@ expect(TextCleanup.clean("He had had enough."), "He had had enough.", "long repe
 expect(TextCleanup.clean("[BLANK_AUDIO] hello there (laughs)"), "Hello there", "non-speech tags")
 expect(TextCleanup.clean("first point. new paragraph. second point"), "First point.\n\nSecond point", "new paragraph")
 expect(TextCleanup.clean("one, new line, two"), "One,\nTwo", "new line")
+expect(TextCleanup.clean("ship it by Friday, new paragraph, next steps"), "Ship it by Friday\n\nNext steps", "comma before new paragraph goes with the break")
+expect(TextCleanup.clean("done. new paragraph next"), "Done.\n\nNext", "sentence punctuation before new paragraph stays")
 expect(TextCleanup.clean("hello .  world ,again"), "Hello. World, again", "punctuation spacing")
 expect(TextCleanup.clean("the umbrella is here"), "The umbrella is here", "filler not inside words")
 expect(TextCleanup.clean("Umm, uhh... yes"), "Yes", "leading fillers with ellipsis")

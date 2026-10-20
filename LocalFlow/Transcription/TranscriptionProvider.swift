@@ -44,10 +44,19 @@ enum TranscriptionError: LocalizedError {
             if status == 401 || status == 403 || body.contains("API_KEY_INVALID")
                 || body.localizedCaseInsensitiveContains("api key not valid")
                 || body.localizedCaseInsensitiveContains("invalid api key") {
-                detail = "the API key was rejected"
+                return "the API key was rejected"
             }
-            return "Server error \(status)" + (detail.isEmpty ? "" : ": \(detail)")
-        case .network(let error): return error.localizedDescription
+            if status == 429 { return "rate limited or out of credits" }
+            if status >= 500 { return "the service is down (HTTP \(status))" }
+            return "server error \(status)" + (detail.isEmpty ? "" : ": \(detail)")
+        case .network(let error):
+            switch (error as? URLError)?.code {
+            case .notConnectedToInternet?, .networkConnectionLost?, .cannotFindHost?, .cannotConnectToHost?,
+                 .dnsLookupFailed?, .internationalRoamingOff?, .dataNotAllowed?:
+                return "no internet connection"
+            case .timedOut?: return "the request timed out"
+            default: return error.localizedDescription
+            }
         case .badResponse(let why): return "Unexpected response: \(why)"
         case .modelMissing(let title):
             if WhisperModel.allIncludingCustom.contains(where: { $0.isDownloaded }) {

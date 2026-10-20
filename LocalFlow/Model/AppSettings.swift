@@ -13,7 +13,12 @@ final class AppSettings: ObservableObject {
     static let shared = AppSettings()
     private let defaults = UserDefaults.standard
 
-    @Published var engineMode: EngineMode { didSet { defaults.set(engineMode.rawValue, forKey: "engineMode") } }
+    @Published var engineMode: EngineMode {
+        didSet {
+            defaults.set(engineMode.rawValue, forKey: "engineMode")
+            if engineMode == .cloud { preferProviderWithKey() }
+        }
+    }
     @Published var cloudProviderID: String { didSet { defaults.set(cloudProviderID, forKey: "cloudProvider") } }
     @Published var cloudModels: [String: String] { didSet { defaults.set(cloudModels, forKey: "cloudModels") } }
     @Published var localModelID: String { didSet { defaults.set(localModelID, forKey: "localModel") } }
@@ -64,6 +69,13 @@ final class AppSettings: ObservableObject {
     var cloudProvidersWithKeys: [CloudProviderID] { CloudProviderID.allCases.filter { $0.apiKey != nil } }
 
     var usesMixtureOfExperts: Bool { engineMode == .cloud && mixtureOfExperts }
+
+    /// Keeps an explicit pick, but a provider with no key gives way to the first one that has a key, so switching to
+    /// Cloud right after importing an ElevenLabs key doesn't land on a keyless OpenAI.
+    func preferProviderWithKey() {
+        guard cloudProvider.apiKey == nil, let first = cloudProvidersWithKeys.first else { return }
+        cloudProviderID = first.rawValue
+    }
 
     func cloudModel(for provider: CloudProviderID) -> String {
         cloudModels[provider.rawValue] ?? provider.defaultModel

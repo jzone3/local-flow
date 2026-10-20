@@ -232,6 +232,7 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
             } else {
                 self.installedVersion += 1
             }
+            if failure == nil, AppSettings.shared.localModelID == id { LocalWhisper.shared.preload() }
         }
     }
 
@@ -252,8 +253,15 @@ final class LocalWhisper: TranscriptionProvider {
     private var context: OpaquePointer?
     private var loadedModelID: String?
     private let queue = DispatchQueue(label: "LocalFlow.whisper", qos: .userInitiated)
+    /// Which model is loaded and ready, readable off the whisper queue so a dictation can say "Loading model…" up front.
+    private let readyLock = NSLock()
+    private var readyModelID: String?
+    private func setReady(_ id: String?) { readyLock.lock(); readyModelID = id; readyLock.unlock() }
+    func isReady(_ model: WhisperModel) -> Bool { readyLock.lock(); defer { readyLock.unlock() }; return readyModelID == model.id }
 
     var name: String { "Whisper \(loadedModelID ?? AppSettings.shared.localModelID) (local)" }
+    /// Called on the main thread with `true` while a dictation waits for the model to load, then `false`.
+    var onModelLoading: ((Bool) -> Void)?
 
     deinit { if let context { whisper_free(context) } }
 
@@ -263,6 +271,7 @@ final class LocalWhisper: TranscriptionProvider {
             whisper_free(context)
             self.context = nil
             loadedModelID = nil
+            setReady(nil)
         }
     }
 
@@ -276,7 +285,7 @@ final class LocalWhisper: TranscriptionProvider {
     private func loadedContext(for model: WhisperModel) throws -> OpaquePointer {
         if let context, loadedModelID == model.id { return context }
         guard model.isDownloaded else { throw TranscriptionError.modelMissing(model.title) }
-        if let context { whisper_free(context); self.context = nil }
+        if let context { whisper_free(context); self.context = nil; setReady(nil) }
         var params = whisper_context_default_params()
         params.use_gpu = true
         params.flash_attn = true
@@ -285,19 +294,26 @@ final class LocalWhisper: TranscriptionProvider {
         }
         context = ctx
         loadedModelID = model.id
+        setReady(model.id)
         return ctx
     }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionResult {
         let model = WhisperModel.named(AppSettings.shared.localModelID)
         let engine = "Whisper \(model.title) (local)"
+        // Decided before queueing: a preload still running on the queue also counts as "loading".
+        let needsLoad = !isReady(model)
+        if needsLoad { DispatchQueue.main.async { self.onModelLoading?(true) } }
         return try await withCheckedThrowingContinuation { continuation in
             queue.async {
+                let loaded = { if needsLoad { DispatchQueue.main.async { self.onModelLoading?(false) } } }
                 do {
                     let ctx = try self.loadedContext(for: model)
+                    loaded()
                     let text = try self.run(ctx, request: request, model: model)
                     continuation.resume(returning: TranscriptionResult(text: text, engine: engine))
                 } catch {
+                    loaded()
                     continuation.resume(throwing: error)
                 }
             }

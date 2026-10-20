@@ -135,7 +135,9 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
         if !userInitiated, UserDefaults.standard.string(forKey: Self.skippedVersionKey) == release.version.description { return }
 
         let alert = alert("Local Flow \(release.version) is available",
-                          "You have \(current). The update is downloaded from GitHub and installed into \(installLocationName).")
+                          canInstallInPlace
+                              ? "You have \(current). The update is downloaded from GitHub and installed into \(installLocationName)."
+                              : "You have \(current). The update is downloaded from GitHub.")
         alert.addButton(withTitle: "Install and Relaunch")
         alert.addButton(withTitle: "Later")
         alert.addButton(withTitle: "Skip This Version")

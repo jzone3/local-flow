@@ -271,6 +271,7 @@ struct OnboardingView: View {
     private func use(_ found: EnvironmentKeys.Found) {
         guard let provider = provider(for: found) else { return }
         Keychain.set(found.value, for: provider.keychainAccount)
+        AppSettings.shared.preferProviderWithKey()
         keyChanged += 1
     }
 

@@ -42,13 +42,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = HistoryStore.shared
         WhisperModel.removeRetiredFiles()
         DictationController.shared.start()
-        Welcome.showIfNeeded {
-            if AppSettings.shared.onboardingDone {
-                LocalWhisper.shared.preload()
-            } else {
-                WindowManager.shared.showOnboarding()
+        MoveToApplications.offerIfNeeded {
+            Welcome.showIfNeeded {
+                if AppSettings.shared.onboardingDone {
+                    LocalWhisper.shared.preload()
+                } else {
+                    WindowManager.shared.showOnboarding()
+                }
+                UpdateChecker.shared.checkOnLaunch()
             }
-            UpdateChecker.shared.checkOnLaunch()
         }
     }
 
@@ -102,6 +104,7 @@ final class WindowManager {
         windows[key] = window
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
+            if key == "history" { HistoryPlayer.shared.stop() }
         }
         return window
     }

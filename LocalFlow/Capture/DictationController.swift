@@ -59,6 +59,10 @@ final class DictationController: ObservableObject {
         hotkey.start()
         settings.$hotkey.dropFirst().sink { [weak self] key in self?.hotkey.update(hotkey: key) }.store(in: &cancellables)
         bar.attach(recorder: recorder, controller: self)
+        LocalWhisper.shared.onModelLoading = { [weak self] loading in
+            guard let self, state == .transcribing else { return }
+            transcribingText = loading ? "Loading model…" : TranscriptionService.transcribingLabel()
+        }
         refreshPermissions()
     }
 
@@ -148,6 +152,9 @@ final class DictationController: ObservableObject {
             return
         }
         transcribingText = TranscriptionService.transcribingLabel()
+        if settings.engineMode == .local, !LocalWhisper.shared.isReady(WhisperModel.named(settings.localModelID)) {
+            transcribingText = "Loading model…"  // the local engine confirms via onModelLoading once the context is up
+        }
         state = .transcribing
         hotkey.escapeArmed = true  // Esc still cancels while the cloud round trip runs
         let entryID = UUID()

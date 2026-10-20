@@ -157,9 +157,10 @@ enum TextCleanup {
         text.replacingOccurrences(of: #"(?i)\b(?!had\b)([A-Za-z']{1,3})(?:[,\s]+\1\b)+"#, with: "$1", options: .regularExpression)
     }
 
-    /// Spoken "new line" / "new paragraph" become line breaks; punctuation before them stays, punctuation glued after goes.
+    /// Spoken "new line" / "new paragraph" become line breaks; sentence punctuation before them stays, a comma before
+    /// "new paragraph" goes with the break, and punctuation glued after goes.
     static func applyVoiceCommands(_ text: String) -> String {
-        var out = text.replacingOccurrences(of: #"(?i)\s*\bnew paragraph\b[,.;:]?\s*"#, with: "\n\n", options: .regularExpression)
+        var out = text.replacingOccurrences(of: #"(?i)(?:\s*[,;:])?\s*\bnew paragraph\b[,.;:]?\s*"#, with: "\n\n", options: .regularExpression)
         out = out.replacingOccurrences(of: #"(?i)\s*\bnew line\b[,.;:]?\s*"#, with: "\n", options: .regularExpression)
         return out
     }
