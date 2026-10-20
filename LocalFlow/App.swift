@@ -76,6 +76,14 @@ final class WindowManager {
 
     func close(_ key: String) { windows[key]?.close() }
 
+    /// Re-activates the app and raises an already open window (after a system permission prompt stole the focus).
+    func bringToFront(_ key: String) {
+        guard let window = windows[key] else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
+
     /// `fixed` windows (setup) have one size and no visible title bar, so the content sits under the traffic lights.
     @discardableResult
     private func show<V: View>(_ key: String, title: String, size: NSSize, fixed: Bool = false, @ViewBuilder content: () -> V) -> NSWindow {
