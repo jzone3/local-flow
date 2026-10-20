@@ -71,11 +71,14 @@ struct DictationBarView: View {
     @ObservedObject var recorder: AudioRecorder
     @ObservedObject var controller: DictationController
 
+    static let rowHeight: CGFloat = 24
+
     var body: some View {
         content
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
-            .frame(minWidth: 220, maxWidth: 560)
+            .frame(height: Self.rowHeight)  // every state is one line of the same height, so the pill never jumps
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(minWidth: 200, maxWidth: 560)
             .modifier(GlassBackground())
             .padding(14)
             .animation(.spring(duration: 0.3), value: controller.state)
@@ -85,17 +88,18 @@ struct DictationBarView: View {
     private var content: some View {
         switch controller.state {
         case .listening:
-            HStack(spacing: 14) {
+            // One line: dot, waveform (the animation says "listening"), then the mic name or the hands-free hint.
+            HStack(spacing: 12) {
                 Circle().fill(.red).frame(width: 9, height: 9)
                     .overlay(Circle().stroke(.red.opacity(0.4), lineWidth: 6).scaleEffect(1 + CGFloat(recorder.level)))
                 Waveform(levels: recorder.levels)
-                    .frame(width: 150, height: 28)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(controller.handsFree ? "Listening · tap \(AppSettings.shared.hotkey.displayName) to stop" : "Listening")
-                        .font(.system(size: 13, weight: .medium)).foregroundStyle(.primary)
-                    Label { Text(AudioInputDevice.current.name) } icon: { Icon("mic", size: 10) }
-                        .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
-                }
+                    .frame(width: 170, height: Self.rowHeight)
+                Label {
+                    Text(controller.handsFree ? "Tap \(AppSettings.shared.hotkey.displayName) to stop" : AudioInputDevice.current.name)
+                } icon: { Icon("mic", size: 11) }
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.tail)
+                    .frame(maxWidth: 150, alignment: .leading)
             }
         case .transcribing:
             HStack(spacing: 12) {
@@ -105,13 +109,12 @@ struct DictationBarView: View {
         case .done:
             HStack(spacing: 10) {
                 Icon("warning", size: 16).foregroundStyle(.orange)
-                Text(controller.lastWarning ?? "Pasted").font(.system(size: 13)).lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(controller.lastWarning ?? "Pasted").font(.system(size: 13)).lineLimit(1).truncationMode(.tail)
             }
         case .failed(let message):
             HStack(spacing: 10) {
                 Icon("x-circle", size: 16).foregroundStyle(.red)
-                Text(message).font(.system(size: 13)).lineLimit(3)
+                Text(message).font(.system(size: 13)).lineLimit(1).truncationMode(.tail)
             }
         case .idle:
             EmptyView()
@@ -140,12 +143,13 @@ struct Waveform: View {
         GeometryReader { geo in
             let count = levels.count
             let gap: CGFloat = 3
-            let width = max(2, (geo.size.width - gap * CGFloat(count - 1)) / CGFloat(count))
+            let width = max(3, (geo.size.width - gap * CGFloat(count - 1)) / CGFloat(count))
             HStack(alignment: .center, spacing: gap) {
                 ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
+                    // Levels are dB-normalised and rarely pass 0.6 in speech; stretch them so the bars fill the row.
                     Capsule()
                         .fill(.primary.opacity(0.85))
-                        .frame(width: width, height: max(3, CGFloat(level) * geo.size.height))
+                        .frame(width: width, height: max(4, min(1, CGFloat(level) * 1.5) * geo.size.height))
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
