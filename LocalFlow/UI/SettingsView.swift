@@ -145,6 +145,48 @@ struct CloudSettings: View {
             MixtureOfExpertsToggle()
                 .id(keyChanged)
         }
+        Section("What gets sent") {
+            WhatGetsSent()
+                .id(keyChanged)
+        }
+    }
+}
+
+/// Exactly what leaves this Mac in Cloud mode, per service, so the user can check it before dictating.
+struct WhatGetsSent: View {
+    @ObservedObject private var settings = AppSettings.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if settings.mixtureOfExperts {
+                Text("Your audio clip (16 kHz WAV) and your dictionary words go to every service below that has a key, each with its own key. Nothing else.")
+                ForEach(CloudProviderID.allCases) { provider in
+                    let keyed = provider.apiKey != nil
+                    Text("\(keyed ? "✓" : "–") \(provider.title) · \(provider.modelTitle(settings.cloudModel(for: provider)))\(keyed ? "" : " · no key, skipped")")
+                        .foregroundStyle(keyed ? .primary : .secondary)
+                }
+                if CloudProviderID.openAI.apiKey != nil {
+                    Text("Then the transcripts (not the audio) and your dictionary words go to OpenAI \(OpenAIChat.mergeModel), which merges them.")
+                } else {
+                    Text("Needs an OpenAI key to merge; without one the best single transcript is used as is.")
+                }
+            } else {
+                let provider = settings.cloudProvider
+                Text("Your audio clip (16 kHz WAV) and your dictionary words go to \(provider.title) (\(provider.modelTitle(settings.cloudModel(for: provider)))) with your key. Nothing else.")
+            }
+            Text(fallbackLine)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var fallbackLine: String {
+        let model = WhisperModel.named(settings.localModelID)
+        guard settings.fallbackToLocal else { return "If the cloud fails, nothing is pasted (local fallback is off)." }
+        return model.isDownloaded
+            ? "If the cloud fails, Whisper \(model.title) on this Mac transcribes instead."
+            : "If the cloud fails, nothing is pasted: the local fallback model (\(model.title)) isn't downloaded."
     }
 }
 
@@ -269,12 +311,18 @@ struct LevelMeter: View {
 }
 
 struct ModelList: View {
+    /// Settings shows the custom models and the "Custom model…" row; setup shows the three built-ins only.
+    var showsCustom = true
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var downloader = ModelDownloader.shared
+    @ObservedObject private var customStore = CustomModelStore.shared
+    @State private var addingCustom = false
+
+    private var models: [WhisperModel] { showsCustom ? WhisperModel.allIncludingCustom : WhisperModel.all }
 
     var body: some View {
         VStack(spacing: 8) {
-            ForEach(WhisperModel.all) { model in
+            ForEach(models) { model in
                 let selected = settings.localModelID == model.id
                 HStack(spacing: 12) {
                     Radio(on: selected)
@@ -296,20 +344,27 @@ struct ModelList: View {
                     Spacer(minLength: 8)
                     trailing(model)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
+                .modifier(ModelRowChrome(selected: selected))
                 .onTapGesture {
                     guard model.isDownloaded else { return }
                     settings.localModelID = model.id
                     LocalWhisper.shared.preload()
                 }
-                .background(selected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(selected ? Color.accentColor.opacity(0.7) : Color(nsColor: .separatorColor), lineWidth: selected ? 1.5 : 1)
-                )
                 .id("\(model.id)-\(downloader.installedVersion)")
+            }
+            if showsCustom {
+                HStack(spacing: 12) {
+                    Icon("download", size: 16).foregroundStyle(.secondary).frame(width: 16)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Custom model…").fontWeight(.semibold)
+                        Text("Any Whisper ggml file, from a Hugging Face link or from this Mac.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Button("Add…") { addingCustom = true }.actionButton().controlSize(.small)
+                }
+                .modifier(ModelRowChrome(selected: false))
+                .onTapGesture { addingCustom = true }
+                .sheet(isPresented: $addingCustom) { AddCustomModelSheet() }
             }
         }
     }
@@ -322,11 +377,185 @@ struct ModelList: View {
         } else if model.isDownloaded {
             Label { Text("Downloaded") } icon: { Icon("check", size: 11) }.font(.caption).foregroundStyle(.green)
             Button("Delete") { downloader.delete(model) }.actionButton().controlSize(.small)
-        } else {
+        } else if model.url != nil {
             Button("Download") { downloader.download(model) }.actionButton(prominent: true).controlSize(.small)
+            if model.isCustom {
+                Button("Remove") { downloader.delete(model) }.actionButton().controlSize(.small)
+            }
+        } else {
+            Button("Remove") { downloader.delete(model) }.actionButton().controlSize(.small)
         }
     }
 }
+
+private struct ModelRowChrome: ViewModifier {
+    let selected: Bool
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+            .background(selected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(selected ? Color.accentColor.opacity(0.7) : Color(nsColor: .separatorColor), lineWidth: selected ? 1.5 : 1)
+            )
+    }
+}
+
+/// Paste a Hugging Face file link or pick a ggml .bin on this Mac; shows the file name and size before "Add".
+struct AddCustomModelSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var urlText = ""
+    @State private var picked: Candidate?
+    @State private var checking = false
+    @State private var problem: String?
+    @State private var lookup: Task<Void, Never>?
+
+    enum Candidate: Equatable {
+        case remote(ModelSource.HuggingFaceFile, bytes: Int64?)
+        case local(URL, bytes: Int64)
+        var fileName: String {
+            switch self {
+            case .remote(let file, _): return file.fileName
+            case .local(let url, _): return url.lastPathComponent
+            }
+        }
+        var bytes: Int64? {
+            switch self {
+            case .remote(_, let bytes): return bytes
+            case .local(_, let bytes): return bytes
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Add a custom model").font(.title3.weight(.semibold))
+            Text("Local Flow runs whisper.cpp, which only loads Whisper models in its ggml format (a .bin file). GGUF, PyTorch and other formats won't work.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Form {
+                LabeledContent("Hugging Face URL") {
+                    TextField("", text: $urlText, prompt: Text("https://huggingface.co/…/ggml-model.bin"))
+                        .textFieldStyle(.roundedBorder)
+                        .labelsHidden()
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity)
+                        .onChange(of: urlText) { _, text in resolve(text) }
+                }
+                HStack {
+                    Text("Or a file on this Mac")
+                    Spacer()
+                    Button("Choose file…", action: chooseFile).actionButton()
+                }
+            }
+            .formStyle(.grouped)
+            .scrollContentBackground(.hidden)
+            .padding(.horizontal, -20)
+            Group {
+                if checking {
+                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Checking…") }
+                } else if let problem {
+                    Label { Text(problem) } icon: { Icon("warning", size: 13) }.foregroundStyle(.red)
+                } else if let picked {
+                    Label {
+                        Text(picked.fileName).fontWeight(.medium) + Text(picked.bytes.map { "  " + ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "").foregroundStyle(.secondary)
+                    } icon: { Icon("check-circle", size: 13).foregroundStyle(.green) }
+                } else {
+                    Text("Paste a link to a .bin file (the “resolve” or “blob” link on Hugging Face), or choose a file.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(.caption)
+            .frame(minHeight: 18, alignment: .leading)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.actionButton().keyboardShortcut(.cancelAction)
+                Button("Add", action: add).actionButton(prominent: true).keyboardShortcut(.defaultAction)
+                    .disabled(picked == nil || checking || problem != nil)
+            }
+        }
+        .padding(20)
+        .frame(width: 480)
+        .onDisappear { lookup?.cancel() }
+    }
+
+    private func resolve(_ text: String) {
+        lookup?.cancel()
+        picked = nil
+        problem = nil
+        checking = false
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        switch ModelSource.parseHuggingFace(trimmed) {
+        case .failure(.notAURL): problem = "That isn't a web address."
+        case .failure(.notHuggingFace): problem = "Only huggingface.co links are supported."
+        case .failure(.notAFile): problem = "That's a repo page, not a file. Open the .bin file and copy its link."
+        case .failure(.notBin): problem = "The link must point to a ggml .bin file."
+        case .success(let file):
+            if let conflict = CustomModelStore.shared.conflict(fileName: file.fileName) { problem = conflict; return }
+            checking = true
+            lookup = Task {
+                let size = await Self.remoteSize(file.downloadURL)
+                guard !Task.isCancelled else { return }
+                checking = false
+                switch size {
+                case .success(let bytes): picked = .remote(file, bytes: bytes)
+                case .failure(let message): problem = message
+                }
+            }
+        }
+    }
+
+    /// HEAD the file (following Hugging Face's redirect to its CDN) for the size, so the row shows it before downloading.
+    private static func remoteSize(_ url: URL) async -> Result<Int64?, String> {
+        var request = URLRequest(url: url)
+        request.httpMethod = "HEAD"
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return .failure("No answer from Hugging Face.") }
+            switch http.statusCode {
+            case 200: return .success(http.expectedContentLength > 0 ? http.expectedContentLength : nil)
+            case 401, 403: return .failure("That file needs a Hugging Face login; only public files work.")
+            case 404: return .failure("Hugging Face has no file at that link (404).")
+            default: return .failure("Hugging Face answered HTTP \(http.statusCode).")
+            }
+        } catch {
+            return .failure(error.localizedDescription)
+        }
+    }
+
+    private func chooseFile() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.data]
+        panel.message = "Pick a Whisper ggml model (.bin)"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        lookup?.cancel()
+        urlText = ""
+        checking = false
+        picked = nil
+        problem = nil
+        guard url.pathExtension.lowercased() == "bin" else { problem = "The file must be a ggml .bin model."; return }
+        if let conflict = CustomModelStore.shared.conflict(fileName: url.lastPathComponent) { problem = conflict; return }
+        guard ModelSource.isGgmlModel(at: url) else { problem = ModelSource.notWhisperMessage; return }
+        let bytes = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+        picked = .local(url, bytes: bytes)
+    }
+
+    private func add() {
+        guard let picked else { return }
+        let failure: String?
+        switch picked {
+        case .remote(let file, let bytes): failure = ModelDownloader.shared.addRemote(file, bytes: bytes ?? 0)
+        case .local(let url, _): failure = ModelDownloader.shared.addLocalFile(url)
+        }
+        if let failure { problem = failure } else { dismiss() }
+    }
+}
+
+extension String: @retroactive Error {}
 
 struct DictionarySettings: View {
     @ObservedObject private var settings = AppSettings.shared

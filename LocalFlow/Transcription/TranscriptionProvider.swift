@@ -50,7 +50,7 @@ enum TranscriptionError: LocalizedError {
         case .network(let error): return error.localizedDescription
         case .badResponse(let why): return "Unexpected response: \(why)"
         case .modelMissing(let title):
-            if WhisperModel.all.contains(where: { $0.isDownloaded }) {
+            if WhisperModel.allIncludingCustom.contains(where: { $0.isDownloaded }) {
                 return "Whisper \(title) isn't downloaded. Pick a downloaded model in Settings → Transcription."
             }
             return "No local Whisper model downloaded yet. Pick one in Settings → Transcription."

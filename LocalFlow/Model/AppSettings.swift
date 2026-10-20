@@ -69,6 +69,20 @@ final class AppSettings: ObservableObject {
         cloudModels[provider.rawValue] ?? provider.defaultModel
     }
 
+    /// The menu bar's one-line answer to "what is transcribing right now": "Local · Best", "Cloud · ElevenLabs Scribe v2",
+    /// "Cloud · Mixture of experts (3 services)".
+    var engineLine: String {
+        switch engineMode {
+        case .local:
+            return "Local · \(WhisperModel.named(localModelID).title)"
+        case .cloud where mixtureOfExperts:
+            let count = cloudProvidersWithKeys.count
+            return "Cloud · \(MixtureOfExperts.title) (\(count) service\(count == 1 ? "" : "s"))"
+        case .cloud:
+            return "Cloud · \(cloudProvider.title) \(cloudProvider.modelTitle(cloudModel(for: cloudProvider)))"
+        }
+    }
+
     func setCloudModel(_ model: String, for provider: CloudProviderID) {
         cloudModels[provider.rawValue] = model
     }
