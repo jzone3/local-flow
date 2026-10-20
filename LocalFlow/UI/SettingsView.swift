@@ -244,7 +244,6 @@ struct ProviderKeyRow: View {
                     Button("Save") { save(key) }
                         .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .actionButton(prominent: true)
-                        .keyboardShortcut(.defaultAction)
                     if editing {
                         Button("Cancel") { editing = false; key = "" }.actionButton()
                     }
