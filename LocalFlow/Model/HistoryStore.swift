@@ -14,6 +14,8 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
     var details: TranscriptionDetails?
     /// Set when the dictation failed: the recording is kept so it can be retried; `text` is empty.
     var error: String?
+    /// File name when the entry came from a dropped/opened file rather than the microphone.
+    var source: String?
 
     var failed: Bool { error != nil }
 }

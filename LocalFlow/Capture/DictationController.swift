@@ -247,6 +247,76 @@ final class DictationController: ObservableObject {
 
     var lastEntry: HistoryEntry? { HistoryStore.shared.entries.max { $0.date < $1.date } }
 
+    // MARK: Files
+
+    private var fileQueue: [URL] = []
+    private var fileRunning = false
+
+    /// Audio or video files from Finder (Services, Open With), a drop on one of our windows, or the menu's
+    /// "Transcribe File…". Each becomes a History entry; the text goes to the clipboard. Runs one at a time, after
+    /// any dictation in progress.
+    func transcribeFiles(_ urls: [URL]) {
+        let accepted = urls.filter(FileAudio.isSupported)
+        if accepted.isEmpty, let first = urls.first {
+            show(failure: "\(first.lastPathComponent) isn't an audio or video file.")
+            return
+        }
+        fileQueue.append(contentsOf: accepted)
+        drainFileQueue()
+    }
+
+    private func drainFileQueue() {
+        guard !fileRunning, !state.isActive, !fileQueue.isEmpty else { return }
+        let url = fileQueue.removeFirst()
+        fileRunning = true
+        Task { [weak self] in
+            await self?.transcribeFile(url)
+            self?.fileRunning = false
+            self?.drainFileQueue()
+        }
+    }
+
+    private func transcribeFile(_ url: URL) async {
+        transcribingText = "Reading \(url.lastPathComponent)…"
+        state = .transcribing
+        bar.show()
+        let samples: [Float]
+        do {
+            samples = try await FileAudio.samples(from: url)
+        } catch {
+            show(failure: error.localizedDescription)
+            return
+        }
+        let duration = Double(samples.count) / AudioRecorder.sampleRate
+        guard duration > 0.35 else {
+            show(failure: "\(url.lastPathComponent) has no sound in it.")
+            return
+        }
+        let entryID = UUID()
+        let audioURL = HistoryStore.shared.newAudioURL(id: entryID)
+        try? AudioRecorder.wavData(from: samples).write(to: audioURL, options: [.atomic, .completeFileProtection])
+        transcribingText = "Transcribing \(url.lastPathComponent)…"
+        do {
+            let outcome = try await TranscriptionService().transcribe(samples: samples, profile: .standard)
+            if TextCleanup.isHallucination(outcome.text) {
+                keepFailed(entryID, audioURL: audioURL, duration: duration, engine: outcome.engine, error: "Didn't catch anything in \(url.lastPathComponent).", details: outcome.details)
+                show(failure: "Didn't catch anything in \(url.lastPathComponent).")
+                return
+            }
+            HistoryStore.shared.add(HistoryEntry(id: entryID, date: Date(), text: outcome.text, rawText: outcome.rawText,
+                                                 engine: outcome.engine, durationSeconds: duration, audioFileName: audioURL.lastPathComponent,
+                                                 details: outcome.details, source: url.lastPathComponent))
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(outcome.text, forType: .string)
+            lastWarning = Self.copiedMessage
+            state = .done
+            scheduleHide(after: 2.5)
+        } catch {
+            keepFailed(entryID, audioURL: audioURL, duration: duration, engine: settings.engineLine, error: Self.friendly(error.localizedDescription), details: nil)
+            show(failure: error.localizedDescription)
+        }
+    }
+
     func retryLast() {
         if let entry = lastEntry { retry(entry) }
     }

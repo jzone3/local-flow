@@ -10,6 +10,7 @@ struct SettingsView: View {
             AboutSettings().tabItem { Label { Text("About") } icon: { Image(nsImage: Icon.nsImage("info", size: 16)) } }
         }
         .padding(20)
+        .transcribesDroppedFiles()
     }
 }
 
@@ -623,6 +624,8 @@ struct PrivacySettings: View {
             }
             Section("History") {
                 Text("Transcripts and recordings are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("To transcribe a recording or a video, drop the file on this window, right-click it in Finder → Services → Transcribe with Local Flow, or use Transcribe File… in the menu bar.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Text(history.entries.isEmpty ? "Nothing yet this session" : "\(history.entries.count) this session")

@@ -19,6 +19,7 @@ struct LocalFlowApp: App {
                 .disabled(history.entries.isEmpty || controller.lastEntry?.failed == true)
             Button("Retry Last Dictation") { controller.retryLast() }
                 .disabled(controller.lastEntry?.audioFileName == nil || controller.state.isActive)
+            Button("Transcribe File…") { FilePicker.chooseAndTranscribe() }
             Divider()
             Button("Check for Updates…") { UpdateChecker.shared.check(userInitiated: true) }
             Button("Run Setup Again…") { WindowManager.shared.showOnboarding() }
@@ -41,6 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         NSApp.setActivationPolicy(.accessory)
+        NSApp.servicesProvider = ServicesProvider.shared  // Finder → right-click → Services → Transcribe with Local Flow
+        NSUpdateDynamicServices()
         _ = HistoryStore.shared
         WhisperModel.removeRetiredFiles()
         DictationController.shared.start()
@@ -56,9 +59,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Finder "Open With", a file dropped on the Dock icon, or `open -a "Local Flow" clip.mp4`.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        DictationController.shared.transcribeFiles(urls)
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag { WindowManager.shared.showSettings() }
         return true
+    }
+}
+
+/// Target of the "Transcribe with Local Flow" Finder service declared in Info.plist (NSServices).
+final class ServicesProvider: NSObject {
+    static let shared = ServicesProvider()
+
+    @objc func transcribeFiles(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString>) {
+        let urls = (pboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        guard !urls.isEmpty else { error.pointee = "No files were passed."; return }
+        DispatchQueue.main.async { DictationController.shared.transcribeFiles(urls) }
+    }
+}
+
+/// Menu bar → "Transcribe File…".
+enum FilePicker {
+    static func chooseAndTranscribe() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = FileAudio.types
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose audio or video files to transcribe"
+        panel.prompt = "Transcribe"
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK else { return }
+        DictationController.shared.transcribeFiles(panel.urls)
     }
 }
 
