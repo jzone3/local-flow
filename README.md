@@ -66,7 +66,7 @@ Drag Local Flow from Applications to the Trash. That leaves behind:
 
 - `~/Library/Application Support/Local Flow/` — the downloaded Whisper models (0.5–1.6 GB each) and the session history.
 - Settings: `defaults delete com.jzone3.LocalFlow`
-- Any API keys you saved, in the login keychain under service `com.jzone3.LocalFlow` (accounts `openai.apiKey`, `elevenlabs.apiKey`, `gemini.apiKey`): remove them in Keychain Access, or `security delete-generic-password -s com.jzone3.LocalFlow -a openai.apiKey` (same for the other two).
+- Any API keys you saved, in the login keychain under service `com.jzone3.LocalFlow.keys` (accounts `openai.apiKey`, `elevenlabs.apiKey`, `gemini.apiKey`; builds before 0.0.7 used `com.jzone3.LocalFlow`): remove them in Keychain Access, or `security delete-generic-password -s com.jzone3.LocalFlow.keys -a openai.apiKey` (same for the other two).
 
 Settings → About → **Remove All Data…** does all three and quits, so only the drag to the Trash is left.
 
