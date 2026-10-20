@@ -140,7 +140,13 @@ struct OnboardingView: View {
                     if AudioRecorder.isDenied {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!)
                     } else {
-                        Task { _ = await AudioRecorder.requestPermission(); controller.refreshPermissions() }
+                        Task {
+                            _ = await AudioRecorder.requestPermission()
+                            controller.refreshPermissions()
+                            // The system prompt belongs to another process; when it closes, focus goes back to whatever app was
+                            // active before setup, not to this menu-bar app. Pull the window forward again.
+                            WindowManager.shared.bringToFront("onboarding")
+                        }
                     }
                 }
                 rowDivider
@@ -162,7 +168,12 @@ struct OnboardingView: View {
         }
         .onAppear { controller.refreshPermissions() }
         // Grants happen in System Settings, so poll while this step is showing; the rows flip to a check on their own.
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in controller.refreshPermissions() }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            let hadAccessibility = controller.hasAccessibility
+            controller.refreshPermissions()
+            // Accessibility is granted over in System Settings; once the switch flips, come back so the user isn't left there.
+            if !hadAccessibility && controller.hasAccessibility { WindowManager.shared.bringToFront("onboarding") }
+        }
     }
 
     private func permissionRow(_ icon: String, _ name: String, granted: Bool, detail: String, action: @escaping () -> Void) -> some View {
