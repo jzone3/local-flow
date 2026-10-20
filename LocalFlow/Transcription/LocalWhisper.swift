@@ -2,16 +2,38 @@ import Combine
 import Foundation
 import whisper
 
-/// The three Whisper models the user can pick from. Best is the default; the others trade accuracy for size.
+/// A Whisper model the user can pick: one of the three built-in tiers, or a custom ggml file they added from a
+/// Hugging Face link or from this Mac. Best is the default; the others trade accuracy for size.
 struct WhisperModel: Identifiable, Equatable {
     let id: String
     let title: String
-    let file: String
+    let fileName: String
     let detail: String
     let bytes: Int64
+    /// Where to download it from; nil for a custom model copied in from a local file.
+    let url: URL?
+    let isCustom: Bool
 
-    var fileName: String { "ggml-\(file).bin" }
-    var url: URL { URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/\(fileName)")! }
+    private init(id: String, title: String, file: String, detail: String, bytes: Int64) {
+        self.id = id
+        self.title = title
+        fileName = "ggml-\(file).bin"
+        self.detail = detail
+        self.bytes = bytes
+        url = URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-\(file).bin")!
+        isCustom = false
+    }
+
+    init(custom record: ModelSource.CustomRecord) {
+        id = record.id
+        title = ModelSource.displayName(forFile: record.fileName)
+        fileName = record.fileName
+        detail = record.sourceURL.map { "Custom · " + ModelSource.shortSource($0) } ?? "Custom · added from this Mac"
+        bytes = record.bytes
+        url = record.sourceURL
+        isCustom = true
+    }
+
     var sizeText: String { ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file) }
 
     static let all: [WhisperModel] = [
@@ -22,9 +44,15 @@ struct WhisperModel: Identifiable, Equatable {
 
     static let recommended = all[0]
 
+    /// The models the user added themselves (Settings → Transcription → Custom model…).
+    static var custom: [WhisperModel] { CustomModelStore.shared.records.map(WhisperModel.init(custom:)) }
+
+    /// Built-ins first, then custom models in the order they were added.
+    static var allIncludingCustom: [WhisperModel] { all + custom }
+
     /// Older builds stored other model IDs; those map to the nearest tier.
     static func named(_ id: String) -> WhisperModel {
-        all.first { $0.id == id } ?? (["large-v3", "medium.en", "medium"].contains(id) ? recommended : id.hasPrefix("small") || id.hasPrefix("base") ? all[2] : recommended)
+        allIncludingCustom.first { $0.id == id } ?? (["large-v3", "medium.en", "medium"].contains(id) ? recommended : id.hasPrefix("small") || id.hasPrefix("base") ? all[2] : recommended)
     }
 
     static var directory: URL {
@@ -36,9 +64,48 @@ struct WhisperModel: Identifiable, Equatable {
     var localURL: URL { WhisperModel.directory.appendingPathComponent(fileName) }
     var isDownloaded: Bool { FileManager.default.fileExists(atPath: localURL.path) }
 
-    /// The Tiny tier used to be ggml-base; nothing loads that file any more.
+    /// The Tiny tier used to be ggml-base; nothing loads that file any more (unless the user added it as a custom model).
     static func removeRetiredFiles() {
+        guard !custom.contains(where: { $0.fileName == "ggml-base.bin" }) else { return }
         try? FileManager.default.removeItem(at: directory.appendingPathComponent("ggml-base.bin"))
+    }
+}
+
+/// The list of custom models, kept in UserDefaults. The files themselves live next to the built-ins in Models/.
+final class CustomModelStore: ObservableObject {
+    static let shared = CustomModelStore()
+    private static let key = "customModels"
+
+    @Published private(set) var records: [ModelSource.CustomRecord] {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(records), forKey: Self.key) }
+    }
+
+    private init() {
+        records = UserDefaults.standard.data(forKey: Self.key).flatMap { try? JSONDecoder().decode([ModelSource.CustomRecord].self, from: $0) } ?? []
+    }
+
+    /// Why a file name can't be added, or nil when it can.
+    static func conflict(fileName: String, builtIns: [WhisperModel] = WhisperModel.all, customNames: [String]) -> String? {
+        if let tier = builtIns.first(where: { $0.fileName == fileName }) { return "That's the built-in \(tier.title) model. Download it from the list above." }
+        if customNames.contains(fileName) { return "That model is already in the list." }
+        return nil
+    }
+
+    func conflict(fileName: String) -> String? { Self.conflict(fileName: fileName, customNames: records.map(\.fileName)) }
+
+    @discardableResult
+    func add(fileName: String, bytes: Int64, sourceURL: URL?) -> WhisperModel {
+        let record = ModelSource.CustomRecord(id: "custom:" + fileName, fileName: fileName, bytes: bytes, sourceURL: sourceURL)
+        records.removeAll { $0.id == record.id }
+        records.append(record)
+        return WhisperModel(custom: record)
+    }
+
+    func remove(id: String) { records.removeAll { $0.id == id } }
+
+    func updateBytes(id: String, bytes: Int64) {
+        guard let index = records.firstIndex(where: { $0.id == id }), records[index].bytes != bytes else { return }
+        records[index].bytes = bytes
     }
 }
 
@@ -57,10 +124,10 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
     func isDownloading(_ model: WhisperModel) -> Bool { tasks[model.id] != nil }
 
     func download(_ model: WhisperModel) {
-        guard tasks[model.id] == nil, !model.isDownloaded else { return }
+        guard tasks[model.id] == nil, !model.isDownloaded, let url = model.url else { return }
         errors[model.id] = nil
         progress[model.id] = 0
-        let task = session.downloadTask(with: model.url)
+        let task = session.downloadTask(with: url)
         task.taskDescription = model.id
         tasks[model.id] = task
         task.resume()
@@ -72,9 +139,15 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
         progress[model.id] = nil
     }
 
+    /// Removes the file. A custom model loses its row too; a built-in just goes back to "Download".
     func delete(_ model: WhisperModel) {
+        cancel(model)
         try? FileManager.default.removeItem(at: model.localURL)
         LocalWhisper.shared.unloadIfCurrent(model)
+        if model.isCustom {
+            CustomModelStore.shared.remove(id: model.id)
+            errors[model.id] = nil
+        }
         installedVersion += 1
         // Keep the selection on a model that exists, or dictation fails until the user notices the radio.
         if AppSettings.shared.localModelID == model.id,
@@ -83,35 +156,81 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
         }
     }
 
+    /// A ggml file already on this Mac: copied into the Models folder and listed as a custom model.
+    func addLocalFile(_ source: URL) -> String? {
+        let fileName = source.lastPathComponent
+        if let conflict = CustomModelStore.shared.conflict(fileName: fileName) { return conflict }
+        guard ModelSource.isGgmlModel(at: source) else { return ModelSource.notWhisperMessage }
+        let destination = WhisperModel.directory.appendingPathComponent(fileName)
+        do {
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.copyItem(at: source, to: destination)
+        } catch { return error.localizedDescription }
+        let bytes = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? Int64) ?? 0
+        let model = CustomModelStore.shared.add(fileName: fileName, bytes: bytes, sourceURL: nil)
+        finishedInstalling(model.id)
+        return nil
+    }
+
+    /// A Hugging Face file: listed right away, then downloaded like a built-in.
+    func addRemote(_ file: ModelSource.HuggingFaceFile, bytes: Int64) -> String? {
+        if let conflict = CustomModelStore.shared.conflict(fileName: file.fileName) { return conflict }
+        let model = CustomModelStore.shared.add(fileName: file.fileName, bytes: bytes, sourceURL: file.downloadURL)
+        installedVersion += 1
+        download(model)
+        return nil
+    }
+
+    private func finishedInstalling(_ id: String) {
+        installedVersion += 1
+        // A fresh install picks "Best" by default; if that one isn't on disk, the model just fetched becomes the active one.
+        if !WhisperModel.named(AppSettings.shared.localModelID).isDownloaded {
+            AppSettings.shared.localModelID = id
+        }
+        LocalWhisper.shared.preload()
+    }
+
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
                                 totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard let id = downloadTask.taskDescription else { return }
-        let expected = totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : WhisperModel.named(id).bytes
-        let fraction = Double(totalBytesWritten) / Double(max(expected, 1))
-        Task { @MainActor in self.progress[id] = fraction }
+        Task { @MainActor in
+            let expected = totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : WhisperModel.named(id).bytes
+            self.progress[id] = Double(totalBytesWritten) / Double(max(expected, 1))
+        }
     }
 
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let id = downloadTask.taskDescription else { return }
-        let model = WhisperModel.named(id)
         let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 0
+        // The temp file is gone once this returns, so move it before hopping to the main actor.
+        let staging = FileManager.default.temporaryDirectory.appendingPathComponent("LocalFlow-\(UUID().uuidString).bin")
         var failure: String?
         if status != 200 {
             failure = "Download failed (HTTP \(status))."
+        } else if !ModelSource.isGgmlModel(at: location) {
+            failure = ModelSource.notWhisperMessage
         } else {
-            do {
-                try? FileManager.default.removeItem(at: model.localURL)
-                try FileManager.default.moveItem(at: location, to: model.localURL)
-            } catch { failure = error.localizedDescription }
+            do { try FileManager.default.moveItem(at: location, to: staging) } catch { failure = error.localizedDescription }
         }
         Task { @MainActor in
+            let model = WhisperModel.named(id)
+            if failure == nil {
+                do {
+                    try? FileManager.default.removeItem(at: model.localURL)
+                    try FileManager.default.moveItem(at: staging, to: model.localURL)
+                } catch { failure = error.localizedDescription }
+            }
+            try? FileManager.default.removeItem(at: staging)
             self.tasks[id] = nil
             self.progress[id] = nil
             self.errors[id] = failure
-            self.installedVersion += 1
-            // A fresh install picks "Best" by default; if that one isn't on disk, the model just fetched becomes the active one.
-            if failure == nil, !WhisperModel.named(AppSettings.shared.localModelID).isDownloaded {
-                AppSettings.shared.localModelID = id
+            if failure == nil {
+                if model.isCustom, let size = try? FileManager.default.attributesOfItem(atPath: model.localURL.path)[.size] as? Int64 {
+                    CustomModelStore.shared.updateBytes(id: id, bytes: size)
+                }
+                self.finishedInstalling(id)
+            } else {
+                self.installedVersion += 1
             }
             if failure == nil, AppSettings.shared.localModelID == id { LocalWhisper.shared.preload() }
         }

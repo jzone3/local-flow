@@ -225,4 +225,82 @@ rec = HotkeyRecording()
 _ = rec.handle(.flagsChanged(keyCode: 59, flags: tapped))
 expect(rec.handle(.flagsChanged(keyCode: 59, flags: 0x2000_0000)) == .committed(Hotkey(keyCode: 59, modifiers: ctrl)), "release with extra bits still counts as all-up")
 
+// ModelSource: Hugging Face links
+let hfResolve = ModelSource.parseHuggingFace("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin")
+expect(try! hfResolve.get().downloadURL.absoluteString, "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin", "hf resolve link kept")
+expect(try! hfResolve.get().fileName, "ggml-base.en.bin", "hf file name")
+expect(try! hfResolve.get().repo, "ggerganov/whisper.cpp", "hf repo")
+let hfBlob = ModelSource.parseHuggingFace("https://huggingface.co/ggerganov/whisper.cpp/blob/main/ggml-tiny.bin")
+expect(try! hfBlob.get().downloadURL.absoluteString, "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin", "hf blob rewritten to resolve")
+let hfQuery = ModelSource.parseHuggingFace(" huggingface.co/someone/models/resolve/v2/sub/dir/ggml-custom.bin?download=true ")
+expect(try! hfQuery.get().downloadURL.absoluteString, "https://huggingface.co/someone/models/resolve/v2/sub/dir/ggml-custom.bin", "hf scheme added, query dropped, subdir kept")
+expect(try! hfQuery.get().revision, "v2", "hf revision")
+expect(ModelSource.parseHuggingFace("https://hf.co/a/b/blob/main/ggml-x.bin").map(\.downloadURL.host) == .success("huggingface.co"), "hf.co maps to huggingface.co")
+expect(ModelSource.parseHuggingFace("https://example.com/a/b/resolve/main/ggml-x.bin") == .failure(.notHuggingFace), "non-HF host refused")
+expect(ModelSource.parseHuggingFace("https://huggingface.co/ggerganov/whisper.cpp") == .failure(.notAFile), "repo page refused")
+expect(ModelSource.parseHuggingFace("https://huggingface.co/ggerganov/whisper.cpp/tree/main") == .failure(.notAFile), "tree page refused")
+expect(ModelSource.parseHuggingFace("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/README.md") == .failure(.notBin), "non-.bin refused")
+expect(ModelSource.parseHuggingFace("https://huggingface.co/a/b/resolve/main/model.gguf") == .failure(.notBin), "gguf refused")
+expect(ModelSource.parseHuggingFace("") == .failure(.notAURL), "empty refused")
+expect(ModelSource.parseHuggingFace("not a url at all") == .failure(.notAURL), "garbage refused")
+
+// ModelSource: ggml magic (0x67676d6c little-endian = bytes "lmgg")
+expect(ModelSource.hasGgmlMagic(Data("lmgg....".utf8)), "ggml magic accepted")
+expect(ModelSource.hasGgmlMagic(Data([0x6c, 0x6d, 0x67, 0x67])), "ggml magic bytes accepted")
+expect(!ModelSource.hasGgmlMagic(Data("ggml....".utf8)), "big-endian spelling refused")
+expect(!ModelSource.hasGgmlMagic(Data("GGUF....".utf8)), "gguf refused")
+expect(!ModelSource.hasGgmlMagic(Data("<!DOCTYPE html>".utf8)), "html page refused")
+expect(!ModelSource.hasGgmlMagic(Data([0x6c, 0x6d])), "short file refused")
+let magicFile = FileManager.default.temporaryDirectory.appendingPathComponent("lf-magic-\(UUID().uuidString).bin")
+try! Data("lmgg".utf8 + [UInt8](repeating: 0, count: 64)).write(to: magicFile)
+expect(ModelSource.isGgmlModel(at: magicFile), "magic read from disk")
+try! Data("nope".utf8).write(to: magicFile)
+expect(!ModelSource.isGgmlModel(at: magicFile), "bad file on disk refused")
+try? FileManager.default.removeItem(at: magicFile)
+expect(!ModelSource.isGgmlModel(at: magicFile), "missing file refused")
+expect(ModelSource.displayName(forFile: "ggml-base.en.bin"), "base.en", "display name strips ggml-/.bin")
+expect(ModelSource.displayName(forFile: "my-model.bin"), "my-model", "display name without prefix")
+expect(ModelSource.displayName(forFile: "ggml-large-v3-turbo-q5_0.bin"), "large-v3-turbo-q5_0", "display name quantised")
+
+// TranscriptionDetails: the History "Details" text
+var local = TranscriptionDetails(mode: .local, seconds: 1.42, finalFrom: "Whisper Best")
+expect(local.text, "Local · Whisper Best · 1.4 s", "details: local is model + seconds only")
+var cloud = TranscriptionDetails(mode: .cloud, seconds: 5.2, finalFrom: "Whisper Best (local)")
+cloud.attempts = [
+    .init(service: "OpenAI", model: "gpt-4o-transcribe", tries: 3, error: "Server error 429", seconds: 4.0, transcript: nil),
+    .init(service: "Whisper Best (local)", model: nil, tries: 1, error: nil, seconds: 1.1, transcript: nil),
+]
+cloud.usedLocalFallback = true
+cloud.fallbackReason = "OpenAI failed (Server error 429). Used the local model instead."
+expect(cloud.text, """
+Cloud · 5.2 s
+✗ OpenAI (gpt-4o-transcribe) — failed after 3 tries: Server error 429
+✓ Whisper Best (local) — 1 try, 1.1 s
+Local fallback used: Whisper Best (local)
+Why: OpenAI failed (Server error 429). Used the local model instead.
+""".trimmingCharacters(in: .newlines), "details: cloud fallback")
+var mix = TranscriptionDetails(mode: .mixture, seconds: 12.0, finalFrom: "ElevenLabs")
+mix.attempts = [
+    .init(service: "ElevenLabs", model: "scribe_v2", tries: 1, error: nil, seconds: 0.7, transcript: "hello there "),
+    .init(service: "Google Gemini", model: "gemini-3.5-flash", tries: 0, error: "The request timed out.", seconds: 25, transcript: nil),
+]
+mix.mergeError = "no OpenAI key; used ElevenLabs alone"
+expect(mix.text, """
+Mixture of experts · 2 services, 1 answered · 12 s
+✓ ElevenLabs (scribe_v2) — 1 try, 0.7 s
+    “hello there”
+✗ Google Gemini (gemini-3.5-flash) — The request timed out.
+Merge: no OpenAI key; used ElevenLabs alone
+Final text from ElevenLabs
+""".trimmingCharacters(in: .newlines), "details: mixture unmerged")
+mix.merger = "OpenAI gpt-5.4-mini (0.9 s)"
+mix.mergeError = nil
+expect(mix.text.hasSuffix("Merged by OpenAI gpt-5.4-mini (0.9 s) → final text"), "details: merged line last")
+// Old history entries (no details) still decode
+struct OldEntry: Codable { let text: String; let details: TranscriptionDetails? }
+let decoded = try! JSONDecoder().decode(OldEntry.self, from: Data(#"{"text":"hi"}"#.utf8))
+expect(decoded.details == nil && decoded.text == "hi", "details: optional decodes from old JSON")
+let roundTrip = try! JSONDecoder().decode(TranscriptionDetails.self, from: try! JSONEncoder().encode(cloud))
+expect(roundTrip == cloud, "details: Codable round trip")
+
 if failures == 0 { print("core tests passed") } else { print("\(failures) failure(s)"); exit(1) }

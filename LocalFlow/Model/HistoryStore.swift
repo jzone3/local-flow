@@ -10,6 +10,8 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
     var engine: String
     var durationSeconds: Double
     var audioFileName: String?
+    /// Added later; entries written by older builds decode without it.
+    var details: TranscriptionDetails?
 }
 
 /// Transcripts and their recordings: kept only on this Mac, only while the app is running (wiped on quit and on

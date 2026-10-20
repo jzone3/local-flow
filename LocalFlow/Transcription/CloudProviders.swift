@@ -53,6 +53,12 @@ enum CloudProviderID: String, CaseIterable, Identifiable {
 
     var defaultModel: String { models[0].id }
 
+    /// "Scribe v2" for scribe_v2; the picker's "(best)"/"(fast)" notes are dropped.
+    func modelTitle(_ id: String) -> String {
+        let title = models.first { $0.id == id }?.title ?? id
+        return title.replacingOccurrences(of: " \\(.*\\)$", with: "", options: .regularExpression)
+    }
+
     var apiKey: String? { Keychain.get(keychainAccount) }
 
     func makeProvider(model: String) -> TranscriptionProvider {

@@ -90,6 +90,17 @@ private struct HistoryRow: View {
             .font(.caption).foregroundStyle(.secondary)
             .actionButton()
             .controlSize(.small)
+            if let details = entry.details {
+                DisclosureGroup("Details") {
+                    Text(details.text)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 4)
+                }
+                .font(.caption)
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -178,7 +178,7 @@ struct OnboardingView: View {
     private var localModel: some View {
         VStack(spacing: 18) {
             header("Download a local model", "Whisper runs on your GPU and audio never leaves this Mac.", icon: "waveform")
-            Form { ModelList() }
+            Form { ModelList(showsCustom: false) }
                 .formStyle(.grouped)
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, -20)
