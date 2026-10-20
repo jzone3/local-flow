@@ -83,7 +83,7 @@ final class ServicesProvider: NSObject {
 
 /// Menu bar → "Transcribe File…".
 enum FilePicker {
-    static func chooseAndTranscribe() {
+    @MainActor static func chooseAndTranscribe() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = FileAudio.types
         panel.allowsMultipleSelection = true
