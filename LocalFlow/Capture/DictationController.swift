@@ -59,6 +59,10 @@ final class DictationController: ObservableObject {
         hotkey.start()
         settings.$hotkey.dropFirst().sink { [weak self] key in self?.hotkey.update(hotkey: key) }.store(in: &cancellables)
         bar.attach(recorder: recorder, controller: self)
+        LocalWhisper.shared.onModelLoading = { [weak self] loading in
+            guard let self, state == .transcribing else { return }
+            transcribingText = loading ? "Loading model…" : TranscriptionService.transcribingLabel()
+        }
         refreshPermissions()
     }
 

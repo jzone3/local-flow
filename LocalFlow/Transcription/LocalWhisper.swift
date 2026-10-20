@@ -113,6 +113,7 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
             if failure == nil, !WhisperModel.named(AppSettings.shared.localModelID).isDownloaded {
                 AppSettings.shared.localModelID = id
             }
+            if failure == nil, AppSettings.shared.localModelID == id { LocalWhisper.shared.preload() }
         }
     }
 
@@ -135,6 +136,8 @@ final class LocalWhisper: TranscriptionProvider {
     private let queue = DispatchQueue(label: "LocalFlow.whisper", qos: .userInitiated)
 
     var name: String { "Whisper \(loadedModelID ?? AppSettings.shared.localModelID) (local)" }
+    /// Called on the main thread with `true` while a dictation waits for the model to load, then `false`.
+    var onModelLoading: ((Bool) -> Void)?
 
     deinit { if let context { whisper_free(context) } }
 
@@ -175,6 +178,9 @@ final class LocalWhisper: TranscriptionProvider {
         return try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 do {
+                    let needsLoad = self.loadedModelID != model.id || self.context == nil
+                    if needsLoad { DispatchQueue.main.async { self.onModelLoading?(true) } }
+                    defer { if needsLoad { DispatchQueue.main.async { self.onModelLoading?(false) } } }
                     let ctx = try self.loadedContext(for: model)
                     let text = try self.run(ctx, request: request, model: model)
                     continuation.resume(returning: TranscriptionResult(text: text, engine: engine))

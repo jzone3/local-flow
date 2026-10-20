@@ -60,6 +60,16 @@ Local engines work the same way: `LocalWhisper` is just another `TranscriptionPr
 - History (`~/Library/Application Support/Local Flow/History`) is one `history.json` plus one `.wav` per dictation, nothing else. The whole folder is emptied when the app quits and again at launch (so a crash leaves nothing behind); Delete removes files right away; while running, the 12-hour purge runs every 5 minutes, on wake and whenever the app comes to the front, and also removes orphaned audio. The folder is excluded from Time Machine so backups never keep a copy.
 - Transcripts are pasted through the pasteboard, which is restored 0.6 s later; a third-party clipboard manager could still record them, as with any dictation app.
 
+## Uninstall
+
+Drag Local Flow from Applications to the Trash. That leaves behind:
+
+- `~/Library/Application Support/Local Flow/` — the downloaded Whisper models (0.5–1.6 GB each) and the session history.
+- Settings: `defaults delete com.jzone3.LocalFlow`
+- Any API keys you saved, in the login keychain under service `com.jzone3.LocalFlow` (accounts `openai.apiKey`, `elevenlabs.apiKey`, `gemini.apiKey`): remove them in Keychain Access, or `security delete-generic-password -s com.jzone3.LocalFlow -a openai.apiKey` (same for the other two).
+
+Settings → About → **Remove All Data…** does all three and quits, so only the drag to the Trash is left.
+
 ## Release
 
 Same pipeline as [New Media Writer](https://github.com/jzone3/new-media-writer): `release.yml` builds, signs, notarizes and publishes `Local-Flow-<version>.dmg` plus a stable `Local-Flow.dmg` on every push to `master` (or a `v*` tag). Push a `release-dry-run/**` branch to get the DMG as a workflow artifact without publishing.
