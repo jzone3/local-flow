@@ -191,6 +191,20 @@ final class AudioRecorder: ObservableObject {
     }
 
     /// 16-bit PCM WAV, the format every provider accepts.
+    /// Reads a WAV written by `wavData` (16-bit mono PCM, 44-byte header) back into samples.
+    static func samples(fromWAV data: Data) -> [Float]? {
+        guard data.count > 44, data.prefix(4) == Data("RIFF".utf8) else { return nil }
+        let pcm = data.dropFirst(44)
+        var out = [Float](); out.reserveCapacity(pcm.count / 2)
+        var i = pcm.startIndex
+        while i + 1 < pcm.endIndex {
+            let v = Int16(bitPattern: UInt16(pcm[i]) | (UInt16(pcm[i + 1]) << 8))
+            out.append(Float(v) / Float(Int16.max))
+            i += 2
+        }
+        return out
+    }
+
     static func wavData(from samples: [Float], sampleRate: Int = Int(AudioRecorder.sampleRate)) -> Data {
         var pcm = Data(capacity: samples.count * 2)
         for s in samples {

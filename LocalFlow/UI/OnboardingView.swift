@@ -64,11 +64,7 @@ struct OnboardingView: View {
                 }
                 Spacer()
                 if current == .cloudIntro {
-                    Button("Not now") { wantsCloud = false; step += 1 }
-                        .actionButton()
-                    Button("Set up cloud") { wantsCloud = true; step += 1 }
-                        .actionButton(prominent: true)
-                        .keyboardShortcut(.defaultAction)
+                    EmptyView()  // the choice sits on the page; two footer buttons would run into the dots
                 } else if step < stepCount - 1 {
                     Button(current == .cloudKeys && settings.cloudProvidersWithKeys.isEmpty ? "Skip" : "Continue") { step += 1 }
                         .actionButton(prominent: true)
@@ -229,6 +225,13 @@ struct OnboardingView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(16)
             .card(cornerRadius: 12)
+            HStack(spacing: 12) {
+                Button("Not now") { wantsCloud = false; step += 1 }
+                    .actionButton()
+                Button("Set up cloud") { wantsCloud = true; step += 1 }
+                    .actionButton(prominent: true)
+                    .keyboardShortcut(.defaultAction)
+            }
         }
     }
 
@@ -300,6 +303,7 @@ struct OnboardingView: View {
     @State private var fnConflict = Hotkey.systemDictationUsesFnTwice
     @State private var tryText = ""
     @State private var sawHotkey = false
+    @FocusState private var tryFocused: Bool
 
     /// Anything that can turn speech into text yet? Otherwise the test box would ask the user to talk into nothing.
     private var canTranscribe: Bool {
@@ -314,6 +318,14 @@ struct OnboardingView: View {
             VStack(spacing: 8) {
                 TextField(canTranscribe ? "Say “I talk faster than I type.”" : "No model downloaded yet", text: $tryText, axis: .vertical)
                     .textFieldStyle(.plain)
+                    .focused($tryFocused)
+                    .onAppear {
+                        // Focus the box for them: holding the hotkey should type here without a click first.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            WindowManager.shared.bringToFront("onboarding")
+                            tryFocused = true
+                        }
+                    }
                     .font(.system(size: 15))
                     .lineLimit(2...3)
                     .padding(.horizontal, 14)
@@ -343,7 +355,7 @@ struct OnboardingView: View {
                             Icon("check-circle", size: 13).foregroundStyle(.green)
                             Text(tryText.isEmpty ? "\(settings.hotkey.displayName) works. Try it again in any app." : "That's it. Works the same in any app.")
                         } else {
-                            Text("Click the box, then press and hold \(settings.hotkey.displayName) to check it's working.")
+                            Text("Press and hold \(settings.hotkey.displayName) and say something to check it's working.")
                         }
                     }
                 }

@@ -4,7 +4,7 @@ import Foundation
 
 struct HistoryEntry: Codable, Identifiable, Equatable {
     let id: UUID
-    let date: Date
+    var date: Date
     var text: String
     var rawText: String
     var engine: String
@@ -12,6 +12,10 @@ struct HistoryEntry: Codable, Identifiable, Equatable {
     var audioFileName: String?
     /// Added later; entries written by older builds decode without it.
     var details: TranscriptionDetails?
+    /// Set when the dictation failed: the recording is kept so it can be retried; `text` is empty.
+    var error: String?
+
+    var failed: Bool { error != nil }
 }
 
 /// Transcripts and their recordings: kept only on this Mac, only while the app is running (wiped on quit and on
@@ -65,6 +69,14 @@ final class HistoryStore: ObservableObject {
 
     func add(_ entry: HistoryEntry) {
         entries.insert(entry, at: 0)
+        save()
+    }
+
+    /// Replaces an entry; the list stays newest-first, so a re-dated (retried) entry moves to the top.
+    func update(_ entry: HistoryEntry) {
+        guard entries.contains(where: { $0.id == entry.id }) else { return }
+        entries.removeAll { $0.id == entry.id }
+        entries.insert(entry, at: entries.firstIndex { $0.date < entry.date } ?? entries.endIndex)
         save()
     }
 

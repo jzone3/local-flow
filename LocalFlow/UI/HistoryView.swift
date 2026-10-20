@@ -38,12 +38,7 @@ struct HistoryView: View {
                     .frame(maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(history.entries) { entry in
-                            HistoryRow(entry: entry, history: history).card(cornerRadius: 14)
-                        }
-                    }
-                    .padding(16)
+                    HistoryList(history: history).padding(16)
                 }
             }
             Divider()
@@ -60,24 +55,51 @@ struct HistoryView: View {
     }
 }
 
+/// The entries as cards, newest first. Used by the History window and inline in Settings → Privacy.
+struct HistoryList: View {
+    @ObservedObject var history: HistoryStore
+
+    var body: some View {
+        LazyVStack(spacing: 10) {
+            ForEach(history.entries) { entry in
+                HistoryRow(entry: entry, history: history).card(cornerRadius: 14)
+            }
+        }
+    }
+}
+
 private struct HistoryRow: View {
     let entry: HistoryEntry
     @ObservedObject var history: HistoryStore
     @ObservedObject private var player = HistoryPlayer.shared
+    @ObservedObject private var controller = DictationController.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(entry.text).textSelection(.enabled)
+            if let error = entry.error {
+                Label { Text(error) } icon: { Icon("x-circle", size: 14).foregroundStyle(.red) }
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(entry.text).textSelection(.enabled)
+            }
             HStack(spacing: 8) {
                 Text(entry.date, style: .relative) + Text(" ago")
-                Text("·")
-                Text(entry.engine)
+                if !entry.failed {
+                    Text("·")
+                    Text(entry.engine)
+                }
                 Text("·")
                 Text(String(format: "%.0fs", entry.durationSeconds))
                 Spacer()
-                Button("Copy") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(entry.text, forType: .string)
+                if entry.audioFileName != nil {
+                    Button(entry.failed ? "Retry" : "Retry → clipboard") { controller.retry(entry) }
+                        .disabled(controller.state.isActive)
+                }
+                if !entry.failed {
+                    Button("Copy") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(entry.text, forType: .string)
+                    }
                 }
                 if let url = history.audioURL(for: entry), FileManager.default.fileExists(atPath: url.path) {
                     Button(player.playingID == entry.id ? "Stop" : "Play") { player.toggle(url, id: entry.id) }

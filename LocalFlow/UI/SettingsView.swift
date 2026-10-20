@@ -334,7 +334,7 @@ struct ModelList: View {
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 8) {
                             Text(model.title).fontWeight(.semibold)
-                            Text(model.sizeText).font(.caption).foregroundStyle(.secondary)
+                            Text(model.isCustom ? model.sizeText : "\(model.sizeText) · \(model.shortName)").font(.caption).foregroundStyle(.secondary)
                             if model == WhisperModel.recommended {
                                 Text("Recommended").font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
                                     .padding(.horizontal, 6).padding(.vertical, 2)
@@ -625,12 +625,16 @@ struct PrivacySettings: View {
                 Text("Transcripts and recordings are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Text("\(history.entries.count) items this session")
+                    Text(history.entries.isEmpty ? "Nothing yet this session" : "\(history.entries.count) this session")
                     Spacer()
-                    Button("Show History") { WindowManager.shared.showHistory() }
-                    Button("Delete All Now", role: .destructive) { history.clear() }
+                    Button("Delete All Now", role: .destructive) { HistoryPlayer.shared.stop(); history.clear() }
+                        .actionButton()
+                        .disabled(history.entries.isEmpty)
                 }
-                .actionButton()
+                if !history.entries.isEmpty {
+                    HistoryList(history: history)
+                        .padding(.vertical, 4)
+                }
             }
         }
         .formStyle(.grouped)
