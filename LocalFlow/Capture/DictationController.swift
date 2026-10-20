@@ -152,6 +152,9 @@ final class DictationController: ObservableObject {
             return
         }
         transcribingText = TranscriptionService.transcribingLabel()
+        if settings.engineMode == .local, !LocalWhisper.shared.isReady(WhisperModel.named(settings.localModelID)) {
+            transcribingText = "Loading model…"  // the local engine confirms via onModelLoading once the context is up
+        }
         state = .transcribing
         hotkey.escapeArmed = true  // Esc still cancels while the cloud round trip runs
         let entryID = UUID()
