@@ -46,6 +46,8 @@ struct HistoryView: View {
             HStack {
                 Text("Kept on this Mac only. Gone when you quit, or after 12 hours. Drop an audio or video file here to transcribe it.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
+                Button("Choose File…") { FilePicker.chooseAndTranscribe() }
+                    .actionButton()
                 Button("Delete All", role: .destructive) { HistoryPlayer.shared.stop(); history.clear() }
                     .actionButton()
                     .disabled(history.entries.isEmpty)
@@ -59,16 +61,43 @@ struct HistoryView: View {
 
 extension View {
     /// Any of our windows accepts an audio/video file dropped on it and transcribes it into History.
-    func transcribesDroppedFiles() -> some View {
-        onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            for provider in providers {
-                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
-                    guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                    DispatchQueue.main.async { DictationController.shared.transcribeFiles([url]) }
+    func transcribesDroppedFiles() -> some View { modifier(DropToTranscribe()) }
+}
+
+/// The drop target, with a "Drop to transcribe" cover while a file is dragged over the window so it's obvious
+/// the window takes files.
+private struct DropToTranscribe: ViewModifier {
+    @State private var targeted = false
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if targeted {
+                    ZStack {
+                        Color(nsColor: .windowBackgroundColor).opacity(0.92)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
+                            .padding(12)
+                        VStack(spacing: 10) {
+                            Icon("waveform", size: 34).foregroundStyle(Color.accentColor)
+                            Text("Drop to transcribe").font(.title3.weight(.semibold))
+                            Text("Audio or video · the text goes to History and your clipboard").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
                 }
             }
-            return !providers.isEmpty
-        }
+            .animation(.easeOut(duration: 0.15), value: targeted)
+            .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
+                for provider in providers {
+                    provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
+                        guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                        DispatchQueue.main.async { DictationController.shared.transcribeFiles([url]) }
+                    }
+                }
+                return !providers.isEmpty
+            }
     }
 }
 

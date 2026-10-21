@@ -10,7 +10,7 @@ You speak faster than you type. Local Flow keeps all voice dictation private. No
 - **Local by default.** Whisper (whisper.cpp with Metal) runs on your Mac. Three models to pick from — Best (recommended), Classic, Tiny — downloaded in-app from Hugging Face; or add any ggml Whisper model by Hugging Face link or local file (Settings → Transcription → Custom model).
 - **Or bring your own key.** Cloud mode sends the clip to OpenAI, ElevenLabs Scribe or Gemini with your key, with retries and automatic fallback to the local model. Optional *Mixture of experts*: every service you have a key for transcribes, then an OpenAI model merges the results — slower, but more accurate. Setup looks for keys in your shell files (`~/.zshrc`, `~/.zprofile`, … and the files they `source`) and shows what it found; nothing is saved until you click *Import from shell*.
 - **Opens at login** once setup is done (Settings → General to turn it off).
-- **Files too.** Drop an audio or video file on the Settings/History window, right-click it in Finder → Services → *Transcribe with Local Flow*, or use *Transcribe File…* in the menu bar: the transcript lands in History and on your clipboard.
+- **Files too.** Drop an audio or video file on the Settings/History window (or click *Choose File…*), right-click it in Finder → Services → *Transcribe with Local Flow*, or use *Transcribe File…* in the menu bar: the transcript lands in History and on your clipboard. Long recordings are cut at pauses into parts of up to 5 minutes (cloud services cap uploads at 20–25 MB), transcribed one after another with progress on the bar, and joined; *Cancel File Transcription* in the menu bar stops it.
 - **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup lets you add word packs for your field (engineering, product, sales, legal…).
 - **Cleanup that never leaves your Mac.** Ums and uhs, capitalization, punctuation and "new paragraph" are handled with rules, not a model. It also knows where you are typing: terminals, code editors and browser address bars get lowercase with no sentence punctuation (`git status`, `example.com`); chat apps skip the final period. On by default, one toggle to turn off.
 - **Short-lived history.** Transcripts and recordings stay on your Mac only while the app is running — wiped when you quit (and on launch), and never kept longer than 12 hours.
@@ -39,7 +39,7 @@ Tests for the pure-Swift core (cleanup rules, dictionary spelling fixes, env-key
 ```
 LocalFlow/
   App.swift                 menu bar app, windows
-  Core/                     TextCleanup, CleanupProfile, Vocabulary(+Packs), EnvironmentKeys, Hotkey, MixtureOfExperts, Version — no AppKit, covered by Tests/
+  Core/                     TextCleanup, CleanupProfile, Vocabulary(+Packs), EnvironmentKeys, Hotkey, MixtureOfExperts, AudioChunker, Version — no AppKit, covered by Tests/
   Capture/                  HotkeyMonitor, AudioRecorder (16 kHz mono), AudioInputDevice, TextInserter (paste), DictationController
   Transcription/            TranscriptionProvider protocol, LocalWhisper (+ model downloader), CloudProviders, TranscriptionService
   Model/                    AppSettings, Keychain, HistoryStore (wiped on quit, 12 h purge), UpdateChecker, Welcome

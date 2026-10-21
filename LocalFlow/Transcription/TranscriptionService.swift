@@ -25,8 +25,9 @@ final class TranscriptionService {
     }
 
     static let maxAttempts = 3
-    /// One slow service must not hold up the paste when others have answered.
-    static let expertTimeout: TimeInterval = 25
+    /// One slow service must not hold up the paste when others have answered. Longer clips (parts of a file)
+    /// get proportionally longer.
+    static func expertTimeout(for duration: Double) -> TimeInterval { 25 + duration / 2 }
 
     let settings: AppSettings
     private let local: TranscriptionProvider
@@ -105,6 +106,33 @@ final class TranscriptionService {
                        rawText: result.text, engine: result.engine, warning: warning, details: details)
     }
 
+    /// A file of any length: audio longer than one upload is transcribed part by part (AudioChunker) and the
+    /// texts joined; `progress(done, total)` runs before each part. Silent parts are skipped, not failures.
+    func transcribeLong(samples: [Float], profile: CleanupProfile = .standard,
+                        progress: @MainActor @Sendable (Int, Int) -> Void = { _, _ in }) async throws -> Outcome {
+        let ranges = AudioChunker.ranges(samples)
+        guard ranges.count > 1 else { return try await transcribe(samples: samples, profile: profile) }
+        let started = Date()
+        var text = "", rawText = "", engine = ""
+        var warning: String?
+        var details: TranscriptionDetails?
+        for (index, range) in ranges.enumerated() {
+            try Task.checkCancellation()
+            await progress(index, ranges.count)
+            let part = try await transcribe(samples: Array(samples[range]), profile: profile)
+            if details == nil { details = part.details }
+            engine = part.engine
+            warning = warning ?? part.warning
+            guard !TextCleanup.isHallucination(part.text) else { continue }
+            text = AudioChunker.join(text, part.text)
+            rawText = AudioChunker.join(rawText, part.rawText)
+        }
+        var merged = details ?? TranscriptionDetails(mode: .local, seconds: 0, finalFrom: engine)
+        merged.seconds = Date().timeIntervalSince(started)
+        merged.parts = ranges.count
+        return Outcome(text: text, rawText: rawText, engine: engine, warning: warning, details: merged)
+    }
+
     /// What the bar should say while this transcription runs.
     static func transcribingLabel(_ settings: AppSettings = .shared) -> String {
         MixtureOfExperts.transcribingLabel(modelCount: settings.usesMixtureOfExperts ? settings.cloudProvidersWithKeys.count : 1)
@@ -130,7 +158,7 @@ final class TranscriptionService {
                 group.addTask {
                     let started = Date()
                     do {
-                        return (provider, try await Self.withTimeout(Self.expertTimeout) {
+                        return (provider, try await Self.withTimeout(Self.expertTimeout(for: request.duration)) {
                             await self.attempt(cloud, request, attempts: Self.maxAttempts)
                         })
                     } catch {

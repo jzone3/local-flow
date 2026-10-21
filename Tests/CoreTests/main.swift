@@ -324,4 +324,31 @@ expect(decoded.details == nil && decoded.text == "hi", "details: optional decode
 let roundTrip = try! JSONDecoder().decode(TranscriptionDetails.self, from: try! JSONEncoder().encode(cloud))
 expect(roundTrip == cloud, "details: Codable round trip")
 
+// AudioChunker
+let rate = AudioChunker.sampleRate
+func tone(seconds: Double, quietAt: [Double] = []) -> [Float] {
+    var out = [Float](repeating: 0.3, count: Int(seconds * Double(rate)))
+    for at in quietAt { for i in Int(at * Double(rate))..<Int((at + 0.5) * Double(rate)) where i < out.count { out[i] = 0.001 } }
+    return out
+}
+expect(AudioChunker.ranges(tone(seconds: 10)) == [0..<(10 * rate)], "chunker: short audio is one part")
+expect(AudioChunker.ranges([]).isEmpty, "chunker: empty audio")
+let long = tone(seconds: 700, quietAt: [290, 560])
+let parts = AudioChunker.ranges(long)
+expect(parts.count == 3, "chunker: 700 s → 3 parts (got \(parts.count))")
+expect(parts.first?.lowerBound == 0 && parts.last?.upperBound == long.count, "chunker: covers the whole file")
+expect(zip(parts, parts.dropFirst()).allSatisfy { $0.upperBound == $1.lowerBound }, "chunker: parts are contiguous")
+expect(parts.allSatisfy { Double($0.count) / Double(rate) <= AudioChunker.maxSeconds }, "chunker: every part fits an upload")
+let firstCut = Double(parts[0].upperBound) / Double(rate)
+expect(firstCut > 289.9 && firstCut < 290.6, "chunker: cut lands in the pause (\(firstCut))")
+let secondCut = Double(parts[1].upperBound) / Double(rate)
+expect(secondCut > 559.9 && secondCut < 560.6, "chunker: second cut lands in the pause (\(secondCut))")
+expect(AudioChunker.ranges(tone(seconds: 300.5)).count == 1, "chunker: a tail under 1 s is dropped, not sent alone")
+expect(AudioChunker.join("Hello there.", " next part") == "Hello there.\n\nnext part", "join: paragraph after a sentence")
+expect(AudioChunker.join("and then we", "kept talking") == "and then we kept talking", "join: space mid-sentence")
+expect(AudioChunker.join("", "first") == "first", "join: empty head")
+var longDetails = TranscriptionDetails(mode: .local, seconds: 90, finalFrom: "Whisper Tiny")
+longDetails.parts = 12
+expect(longDetails.text.hasPrefix("Transcribed in 12 parts of up to 5 minutes; the lines below are for part 1.\nLocal · Whisper Tiny · 90 s"), "details: parts line")
+
 if failures == 0 { print("core tests passed") } else { print("\(failures) failure(s)"); exit(1) }

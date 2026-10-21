@@ -250,7 +250,9 @@ final class DictationController: ObservableObject {
     // MARK: Files
 
     private var fileQueue: [URL] = []
-    private var fileRunning = false
+    private var fileTask: Task<Void, Never>?
+    /// A file is being read or transcribed (the menu offers Cancel while it is).
+    @Published private(set) var fileRunning = false
 
     /// Audio or video files from Finder (Services, Open With), a drop on one of our windows, or the menu's
     /// "Transcribe File…". Each becomes a History entry; the text goes to the clipboard. Runs one at a time, after
@@ -269,11 +271,18 @@ final class DictationController: ObservableObject {
         guard !fileRunning, !state.isActive, !fileQueue.isEmpty else { return }
         let url = fileQueue.removeFirst()
         fileRunning = true
-        Task { [weak self] in
+        fileTask = Task { [weak self] in
             await self?.transcribeFile(url)
             self?.fileRunning = false
+            self?.fileTask = nil
             self?.drainFileQueue()
         }
+    }
+
+    /// Stops the file in progress (after the current part) and forgets the ones waiting.
+    func cancelFiles() {
+        fileQueue.removeAll()
+        fileTask?.cancel()
     }
 
     private func transcribeFile(_ url: URL) async {
@@ -287,6 +296,7 @@ final class DictationController: ObservableObject {
             show(failure: error.localizedDescription)
             return
         }
+        guard !Task.isCancelled else { state = .idle; bar.hide(); return }
         let duration = Double(samples.count) / AudioRecorder.sampleRate
         guard duration > 0.35 else {
             show(failure: "\(url.lastPathComponent) has no sound in it.")
@@ -295,9 +305,12 @@ final class DictationController: ObservableObject {
         let entryID = UUID()
         let audioURL = HistoryStore.shared.newAudioURL(id: entryID)
         try? AudioRecorder.wavData(from: samples).write(to: audioURL, options: [.atomic, .completeFileProtection])
-        transcribingText = "Transcribing \(url.lastPathComponent)…"
+        let name = url.lastPathComponent
+        transcribingText = "Transcribing \(name)…"
         do {
-            let outcome = try await TranscriptionService().transcribe(samples: samples, profile: .standard)
+            let outcome = try await TranscriptionService().transcribeLong(samples: samples, profile: .standard) { [weak self] done, total in
+                self?.transcribingText = "Transcribing \(name) · part \(done + 1) of \(total)"
+            }
             if TextCleanup.isHallucination(outcome.text) {
                 keepFailed(entryID, audioURL: audioURL, duration: duration, engine: outcome.engine, error: "Didn't catch anything in \(url.lastPathComponent).", details: outcome.details)
                 show(failure: "Didn't catch anything in \(url.lastPathComponent).")
@@ -311,6 +324,10 @@ final class DictationController: ObservableObject {
             lastWarning = Self.copiedMessage
             state = .done
             scheduleHide(after: 2.5)
+        } catch is CancellationError {
+            try? FileManager.default.removeItem(at: audioURL)
+            state = .idle
+            bar.hide()
         } catch {
             keepFailed(entryID, audioURL: audioURL, duration: duration, engine: settings.engineLine, error: Self.friendly(error.localizedDescription), details: nil)
             show(failure: error.localizedDescription)

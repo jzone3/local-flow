@@ -630,11 +630,13 @@ struct PrivacySettings: View {
             Section("History") {
                 Text("Transcripts and recordings are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way.")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("To transcribe a recording or a video, drop the file on this window, right-click it in Finder → Services → Transcribe with Local Flow, or use Transcribe File… in the menu bar.")
+                Text("To transcribe a recording or a video, drop the file on this window or click Choose File…; or right-click it in Finder → Services → Transcribe with Local Flow. Long files go in 5-minute parts; the menu bar shows progress and offers Cancel.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Text(history.entries.isEmpty ? "Nothing yet this session" : "\(history.entries.count) this session")
                     Spacer()
+                    Button("Choose File…") { FilePicker.chooseAndTranscribe() }
+                        .actionButton()
                     Button("Delete All Now", role: .destructive) { HistoryPlayer.shared.stop(); history.clear() }
                         .actionButton()
                         .disabled(history.entries.isEmpty)

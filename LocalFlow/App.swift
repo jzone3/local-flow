@@ -20,6 +20,9 @@ struct LocalFlowApp: App {
             Button("Retry Last Dictation") { controller.retryLast() }
                 .disabled(controller.lastEntry?.audioFileName == nil || controller.state.isActive)
             Button("Transcribe File…") { FilePicker.chooseAndTranscribe() }
+            if controller.fileRunning {
+                Button("Cancel File Transcription") { controller.cancelFiles() }
+            }
             Divider()
             Button("Check for Updates…") { UpdateChecker.shared.check(userInitiated: true) }
             Button("Run Setup Again…") { WindowManager.shared.showOnboarding() }

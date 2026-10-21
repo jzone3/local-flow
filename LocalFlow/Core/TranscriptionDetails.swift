@@ -24,12 +24,15 @@ struct TranscriptionDetails: Codable, Equatable {
     var mergeError: String?        // why the merge didn't happen, when it was supposed to
     var usedLocalFallback = false
     var fallbackReason: String?
+    /// Long files are transcribed in parts (see AudioChunker); the attempts kept are part 1's.
+    var parts: Int?
 
     static func seconds(_ value: Double) -> String { String(format: value < 10 ? "%.1f s" : "%.0f s", value) }
 
     /// Plain lines for the History "Details" disclosure.
     var text: String {
         var lines: [String] = []
+        if let parts, parts > 1 { lines.append("Transcribed in \(parts) parts of up to \(Int(AudioChunker.maxSeconds / 60)) minutes; the lines below are for part 1.") }
         switch mode {
         case .local:
             lines.append("Local · \(finalFrom) · \(Self.seconds(seconds))")
