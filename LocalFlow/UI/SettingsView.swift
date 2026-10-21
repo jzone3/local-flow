@@ -602,6 +602,7 @@ struct DictionarySettings: View {
                 .font(.system(.body, design: .monospaced))
                 .frame(minHeight: 240)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
+                .background(FileDropPassthrough())
             HStack {
                 Text(settings.vocabulary.terms.count == 1 ? "1 term" : "\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
                 Spacer()
@@ -805,5 +806,33 @@ struct FlowLayout: Layout {
             rowHeight = max(rowHeight, size.height)
         }
         return (CGSize(width: maxWidth, height: y + rowHeight), origins)
+    }
+}
+
+/// A TextEditor is an NSTextView, which takes a dropped file itself and pastes its path into the text. Taking
+/// file URLs out of its drag types lets the drop fall through to the window's "Drop to transcribe" target.
+private struct FileDropPassthrough: NSViewRepresentable {
+    func makeNSView(context: Context) -> Finder { Finder() }
+    func updateNSView(_ view: Finder, context: Context) { view.apply() }
+
+    final class Finder: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            DispatchQueue.main.async { [weak self] in self?.apply() }
+        }
+
+        func apply() {
+            guard let root = window?.contentView else { return }
+            for textView in root.descendants(of: NSTextView.self)
+            where !textView.isFieldEditor && textView.registeredDraggedTypes.contains(.fileURL) {
+                textView.registerForDraggedTypes(textView.registeredDraggedTypes.filter { $0 != .fileURL })
+            }
+        }
+    }
+}
+
+private extension NSView {
+    func descendants<T: NSView>(of type: T.Type) -> [T] {
+        subviews.flatMap { view -> [T] in ((view as? T).map { [$0] } ?? []) + view.descendants(of: type) }
     }
 }
