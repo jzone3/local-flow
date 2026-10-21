@@ -114,7 +114,7 @@ private struct HistoryRow: View {
                 Spacer()
                 if entry.audioFileName != nil {
                     Button("Retry") { controller.retry(entry) }
-                        .help(entry.failed ? "Transcribe this recording again (the recording is kept 5 minutes)" : "Transcribe again; the result goes to the clipboard")
+                        .help("Transcribe the recording again (kept for 5 minutes); the result goes to the clipboard")
                         .disabled(controller.state.isActive)
                 }
                 if !entry.failed {

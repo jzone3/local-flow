@@ -280,8 +280,11 @@ final class DictationController: ObservableObject {
     }
 
     /// Stops the file in progress (after the current part) and forgets the ones waiting.
+    /// The part already with the engine finishes first (whisper.cpp can't be interrupted mid-decode), so the bar
+    /// says what's happening in the meantime.
     func cancelFiles() {
         fileQueue.removeAll()
+        if fileRunning { transcribingText = "Cancelling after this part…" }
         fileTask?.cancel()
     }
 

@@ -6,6 +6,21 @@ You speak faster than you type. Local Flow keeps all voice dictation private. No
 
 [uselocalflow.app](https://www.uselocalflow.app)
 
+<p align="center">
+  <img src="docs/screenshots/bar-listening.png" alt="The listening bar: red dot, live waveform, microphone name" width="413">
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center" valign="top"><img src="docs/screenshots/settings-transcription.png" alt="Settings → Transcription: Local only / Cloud, model tiers Best, Classic, Tiny, custom model" width="440"></td>
+    <td align="center" valign="top"><img src="docs/screenshots/history.png" alt="History: three transcripts, one from a dropped mp4, with Retry, Copy and Delete" width="385"></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="docs/screenshots/drop.png" alt="Dragging an audio file over the History window shows a dashed Drop to transcribe cover" width="418"></td>
+    <td align="center" valign="top"><img src="docs/screenshots/menu-bar.png" alt="Menu bar menu while a long file is transcribing: Transcribing hour.m4a · part 1 of 16, Cancel File Transcription" width="223"></td>
+  </tr>
+</table>
+
 - **Hold to talk.** Fn by default; pick any key in Settings. Double-tap it to keep listening hands-free, tap again to stop. A small Liquid Glass bar shows a live waveform while you speak; the text goes straight to your cursor. Pick which microphone to use in Settings.
 - **Local by default.** Whisper (whisper.cpp with Metal) runs on your Mac. Three models to pick from — Best (recommended), Classic, Tiny — downloaded in-app from Hugging Face; or add any ggml Whisper model by Hugging Face link or local file (Settings → Transcription → Custom model).
 - **Or bring your own key.** Cloud mode sends the clip to OpenAI, ElevenLabs Scribe or Gemini with your key, with retries and automatic fallback to the local model. Optional *Mixture of experts*: every service you have a key for transcribes, then an OpenAI model merges the results — slower, but more accurate. Setup looks for keys in your shell files (`~/.zshrc`, `~/.zprofile`, … and the files they `source`) and shows what it found; nothing is saved until you click *Import from shell*.
