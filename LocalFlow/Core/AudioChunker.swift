@@ -12,7 +12,7 @@ enum AudioChunker {
     static let searchSeconds = 45.0
     /// Loudness is measured over windows this long; the quietest one in the search range is the cut.
     static let windowSeconds = 0.25
-    /// A tail shorter than this is dropped rather than sent on its own.
+    /// A tail shorter than this joins the previous part rather than being sent on its own.
     static let minSeconds = 1.0
 
     /// Sample ranges, in order, covering the audio. One range (the whole thing) when it fits in a single part.
@@ -38,7 +38,8 @@ enum AudioChunker {
             ranges.append(start..<cut)
             start = cut
         }
-        if count - start >= minSamples { ranges.append(start..<count) }
+        if count - start >= minSamples || ranges.isEmpty { ranges.append(start..<count) }
+        else { ranges[ranges.count - 1] = ranges[ranges.count - 1].lowerBound..<count }  // sub-second tail rides with the last part
         return ranges
     }
 
