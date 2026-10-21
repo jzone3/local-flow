@@ -32,7 +32,7 @@ enum AudioChunker {
             var position = max(start + minSamples, limit - searchSamples)
             while position + window <= limit {
                 let level = loudness(position..<(position + window))
-                if level < quietest { quietest = level; cut = position + window / 2 }
+                if level <= quietest { quietest = level; cut = position + window / 2 }  // ties → the later window, so parts stay long
                 position += window
             }
             ranges.append(start..<cut)
