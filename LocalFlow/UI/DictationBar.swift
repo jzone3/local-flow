@@ -150,10 +150,10 @@ struct Waveform: View {
             let width = max(3, (geo.size.width - gap * CGFloat(count - 1)) / CGFloat(count))
             HStack(alignment: .center, spacing: gap) {
                 ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
-                    // Levels are dB-normalised and rarely pass 0.6 in speech; stretch them so the bars fill the row.
+                    // Levels are already auto-gained (AutoGain); a little stretch so loud speech reaches the top.
                     Capsule()
                         .fill(.primary.opacity(0.85))
-                        .frame(width: width, height: max(4, min(1, CGFloat(level) * 1.5) * geo.size.height))
+                        .frame(width: width, height: max(4, min(1, CGFloat(level) * 1.2) * geo.size.height))
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)

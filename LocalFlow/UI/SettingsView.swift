@@ -598,8 +598,7 @@ struct DictionarySettings: View {
                 .font(.caption).foregroundStyle(.secondary)
             Text("Word packs").font(.subheadline).fontWeight(.medium).padding(.top, 4)
             PackPicker(columns: 2)
-            TextEditor(text: $settings.vocabularyText)
-                .font(.system(.body, design: .monospaced))
+            VocabularyEditor(text: $settings.vocabularyText)
                 .frame(minHeight: 240)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
             HStack {
@@ -628,14 +627,16 @@ struct PrivacySettings: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("History") {
-                Text("Transcripts and recordings are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way.")
+                Text("Transcripts are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way. The voice recording itself is deleted 5 minutes after each dictation, so it can be retried but never played back.")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("To transcribe a recording or a video, drop the file on this window, right-click it in Finder → Services → Transcribe with Local Flow, or use Transcribe File… in the menu bar.")
+                Text("To transcribe a recording or a video, drop the file on this window or click Choose File…; or right-click it in Finder → Services → Transcribe with Local Flow. Long files go in 5-minute parts; the menu bar shows progress and offers Cancel.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Text(history.entries.isEmpty ? "Nothing yet this session" : "\(history.entries.count) this session")
                     Spacer()
-                    Button("Delete All Now", role: .destructive) { HistoryPlayer.shared.stop(); history.clear() }
+                    Button("Choose File…") { FilePicker.chooseAndTranscribe() }
+                        .actionButton()
+                    Button("Delete All Now", role: .destructive) { history.clear() }
                         .actionButton()
                         .disabled(history.entries.isEmpty)
                 }
@@ -803,5 +804,76 @@ struct FlowLayout: Layout {
             rowHeight = max(rowHeight, size.height)
         }
         return (CGSize(width: maxWidth, height: y + rowHeight), origins)
+    }
+}
+
+/// Our own NSTextView for the dictionary, because SwiftUI's TextEditor takes every dropped file itself and pastes
+/// its path into the text. Here a dropped file goes to transcription, like a drop anywhere else on the window.
+private struct VocabularyEditor: NSViewRepresentable {
+    @Binding var text: String
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.borderType = .noBorder
+        let textView = FileDroppingTextView()
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.usesFindBar = true
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        textView.textContainerInset = NSSize(width: 4, height: 6)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.minSize = .zero
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        textView.string = text
+        scroll.documentView = textView
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let textView = scroll.documentView as? NSTextView, textView.string != text else { return }
+        textView.string = text
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+        init(text: Binding<String>) { self.text = text }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            text.wrappedValue = textView.string
+        }
+    }
+
+    final class FileDroppingTextView: NSTextView {
+        private func files(in sender: NSDraggingInfo) -> [URL] {
+            (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        }
+
+        override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+            files(in: sender).isEmpty ? super.draggingEntered(sender) : .copy
+        }
+
+        override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+            files(in: sender).isEmpty ? super.draggingUpdated(sender) : .copy
+        }
+
+        override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+            let urls = files(in: sender)
+            guard !urls.isEmpty else { return super.performDragOperation(sender) }
+            DictationController.shared.transcribeFiles(urls)
+            return true
+        }
     }
 }

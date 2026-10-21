@@ -6,14 +6,29 @@ You speak faster than you type. Local Flow keeps all voice dictation private. No
 
 [uselocalflow.app](https://www.uselocalflow.app)
 
-- **Hold to talk.** Fn by default; pick any key in Settings. Double-tap it to keep listening hands-free, tap again to stop. A small Liquid Glass bar shows a live waveform while you speak; the text goes straight to your cursor. Pick which microphone to use in Settings.
+<p align="center">
+  <img src="docs/screenshots/bar-listening.png" alt="The listening bar: red dot, live waveform, microphone name" width="413">
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center" valign="top"><img src="docs/screenshots/settings-transcription.png" alt="Settings → Transcription: Local only / Cloud, model tiers Best, Classic, Tiny, custom model" width="440"></td>
+    <td align="center" valign="top"><img src="docs/screenshots/history.png" alt="History: three transcripts, one from a dropped mp4, with Retry, Copy and Delete" width="385"></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="docs/screenshots/drop.png" alt="Dragging an audio file over the History window shows a dashed Drop to transcribe cover" width="418"></td>
+    <td align="center" valign="top"><img src="docs/screenshots/menu-bar.png" alt="Menu bar menu while a long file is transcribing: Transcribing hour.m4a · part 1 of 16, Cancel File Transcription" width="223"></td>
+  </tr>
+</table>
+
+- **Hold to talk.** Fn by default; pick any key in Settings. Double-tap it to keep listening hands-free, tap again to stop. A small Liquid Glass bar shows a live waveform while you speak (it adapts to your mic level, so a quiet input still moves); the text goes straight to your cursor. Pick which microphone to use in Settings.
 - **Local by default.** Whisper (whisper.cpp with Metal) runs on your Mac. Three models to pick from — Best (recommended), Classic, Tiny — downloaded in-app from Hugging Face; or add any ggml Whisper model by Hugging Face link or local file (Settings → Transcription → Custom model).
 - **Or bring your own key.** Cloud mode sends the clip to OpenAI, ElevenLabs Scribe or Gemini with your key, with retries and automatic fallback to the local model. Optional *Mixture of experts*: every service you have a key for transcribes, then an OpenAI model merges the results — slower, but more accurate. Setup looks for keys in your shell files (`~/.zshrc`, `~/.zprofile`, … and the files they `source`) and shows what it found; nothing is saved until you click *Import from shell*.
 - **Opens at login** once setup is done (Settings → General to turn it off).
-- **Files too.** Drop an audio or video file on the Settings/History window, right-click it in Finder → Services → *Transcribe with Local Flow*, or use *Transcribe File…* in the menu bar: the transcript lands in History and on your clipboard.
+- **Files too.** Drop an audio or video file on any Local Flow window (or click *Choose File…*), right-click it in Finder → Services → *Transcribe with Local Flow*, or use *Transcribe File…* in the menu bar: the transcript lands in History and on your clipboard. Long recordings are cut at pauses into parts of up to 5 minutes (cloud services cap uploads at 20–25 MB), transcribed one after another with progress on the bar, and joined; *Cancel File Transcription* in the menu bar stops it.
 - **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup lets you add word packs for your field (engineering, product, sales, legal…).
 - **Cleanup that never leaves your Mac.** Ums and uhs, capitalization, punctuation and "new paragraph" are handled with rules, not a model. It also knows where you are typing: terminals, code editors and browser address bars get lowercase with no sentence punctuation (`git status`, `example.com`); chat apps skip the final period. On by default, one toggle to turn off.
-- **Short-lived history.** Transcripts and recordings stay on your Mac only while the app is running — wiped when you quit (and on launch), and never kept longer than 12 hours.
+- **Short-lived history.** Transcripts stay on your Mac only while the app is running — wiped when you quit (and on launch), and never kept longer than 12 hours. The voice recording behind each one is deleted after 5 minutes (long enough for a Retry) and can't be played back in the app.
 - **Self-updating.** Checks GitHub Releases once a day and installs the new DMG in place.
 
 ## Install
@@ -39,7 +54,7 @@ Tests for the pure-Swift core (cleanup rules, dictionary spelling fixes, env-key
 ```
 LocalFlow/
   App.swift                 menu bar app, windows
-  Core/                     TextCleanup, CleanupProfile, Vocabulary(+Packs), EnvironmentKeys, Hotkey, MixtureOfExperts, Version — no AppKit, covered by Tests/
+  Core/                     TextCleanup, CleanupProfile, Vocabulary(+Packs), EnvironmentKeys, Hotkey, MixtureOfExperts, AudioChunker, Version — no AppKit, covered by Tests/
   Capture/                  HotkeyMonitor, AudioRecorder (16 kHz mono), AudioInputDevice, TextInserter (paste), DictationController
   Transcription/            TranscriptionProvider protocol, LocalWhisper (+ model downloader), CloudProviders, TranscriptionService
   Model/                    AppSettings, Keychain, HistoryStore (wiped on quit, 12 h purge), UpdateChecker, Welcome
@@ -59,7 +74,7 @@ Local engines work the same way: `LocalWhisper` is just another `TranscriptionPr
 - Local mode: audio and text never leave the Mac.
 - Cloud mode: only the audio clip and the dictionary hint go to the provider you chose, using your key (stored in the Keychain). Mixture of experts sends the same clip to every service you have a key for, and their transcripts (text only) to OpenAI for merging. Local Flow has no server and keeps no logs; the providers may keep what you send under their own terms.
 - Cleanup and spelling fixes are deterministic and on-device. There is no LLM cleanup pass.
-- History (`~/Library/Application Support/Local Flow/History`) is one `history.json` plus one `.wav` per dictation, nothing else. The whole folder is emptied when the app quits and again at launch (so a crash leaves nothing behind); Delete removes files right away; while running, the 12-hour purge runs every 5 minutes, on wake and whenever the app comes to the front, and also removes orphaned audio. The folder is excluded from Time Machine so backups never keep a copy.
+- History (`~/Library/Application Support/Local Flow/History`) is one `history.json` plus one `.wav` per dictation, nothing else. The whole folder is emptied when the app quits and again at launch (so a crash leaves nothing behind); Delete removes files right away; while running, the purge runs every minute (recordings go after 5 minutes, text after 12 hours), on wake and whenever the app comes to the front, and also removes orphaned audio. The folder is excluded from Time Machine so backups never keep a copy.
 - Transcripts are pasted through the pasteboard, which is restored 0.6 s later; a third-party clipboard manager could still record them, as with any dictation app.
 
 ## Uninstall

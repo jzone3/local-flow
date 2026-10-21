@@ -324,4 +324,55 @@ expect(decoded.details == nil && decoded.text == "hi", "details: optional decode
 let roundTrip = try! JSONDecoder().decode(TranscriptionDetails.self, from: try! JSONEncoder().encode(cloud))
 expect(roundTrip == cloud, "details: Codable round trip")
 
+// AudioChunker
+let rate = AudioChunker.sampleRate
+func tone(seconds: Double, quietAt: [Double] = []) -> [Float] {
+    var out = [Float](repeating: 0.3, count: Int(seconds * Double(rate)))
+    for at in quietAt { for i in Int(at * Double(rate))..<Int((at + 0.5) * Double(rate)) where i < out.count { out[i] = 0.001 } }
+    return out
+}
+expect(AudioChunker.ranges(tone(seconds: 10)) == [0..<(10 * rate)], "chunker: short audio is one part")
+expect(AudioChunker.ranges([]).isEmpty, "chunker: empty audio")
+let long = tone(seconds: 700, quietAt: [290, 560])
+let parts = AudioChunker.ranges(long)
+expect(parts.count == 3, "chunker: 700 s → 3 parts (got \(parts.count))")
+expect(parts.first?.lowerBound == 0 && parts.last?.upperBound == long.count, "chunker: covers the whole file")
+expect(zip(parts, parts.dropFirst()).allSatisfy { $0.upperBound == $1.lowerBound }, "chunker: parts are contiguous")
+expect(parts.allSatisfy { Double($0.count) / Double(rate) <= AudioChunker.maxSeconds }, "chunker: every part fits an upload")
+let firstCut = Double(parts[0].upperBound) / Double(rate)
+expect(firstCut > 289.9 && firstCut < 290.6, "chunker: cut lands in the pause (\(firstCut))")
+let secondCut = Double(parts[1].upperBound) / Double(rate)
+expect(secondCut > 559.9 && secondCut < 560.6, "chunker: second cut lands in the pause (\(secondCut))")
+expect(AudioChunker.ranges(tone(seconds: 300.5, quietAt: [299.9])).count == 1, "chunker: a tail under 1 s joins the last part")
+let flat = AudioChunker.ranges(tone(seconds: 300.5))
+expect(flat.count == 1 && flat[0].upperBound == Int(300.5 * Double(rate)), "chunker: no pause → one part reaching the end")
+expect(AudioChunker.join("Hello there.", " next part") == "Hello there.\n\nnext part", "join: paragraph after a sentence")
+expect(AudioChunker.join("and then we", "kept talking") == "and then we kept talking", "join: space mid-sentence")
+expect(AudioChunker.join("", "first") == "first", "join: empty head")
+var longDetails = TranscriptionDetails(mode: .local, seconds: 90, finalFrom: "Whisper Tiny")
+longDetails.parts = 12
+expect(longDetails.text.hasPrefix("Transcribed in 12 parts of up to 5 minutes; the lines below are for part 1.\nLocal · Whisper Tiny · 90 s"), "details: parts line")
+
+
+// AutoGain: a quiet microphone still moves the waveform
+var quiet = AutoGain()
+var quietLevels: [Float] = []
+for i in 0..<400 {
+    // room noise at -58 dB, speech bursts at -44 dB (an input volume of ~25%)
+    let speaking = (i / 40) % 2 == 1
+    quietLevels.append(quiet.level(rms: speaking ? 0.0063 : 0.0013))
+}
+let quietSpeech = quietLevels.enumerated().filter { ($0.offset / 40) % 2 == 1 }.map(\.element)
+let quietNoise = quietLevels.enumerated().filter { ($0.offset / 40) % 2 == 0 }.map(\.element).dropFirst(40)
+expect((quietSpeech.max() ?? 0) > 0.7, "autogain: quiet speech fills the bars (\(quietSpeech.max() ?? 0))")
+expect((quietNoise.max() ?? 1) < 0.25, "autogain: room noise between words stays low (\(quietNoise.max() ?? 1))")
+var loud = AutoGain()
+var loudTop: Float = 0
+for i in 0..<200 { loudTop = max(loudTop, loud.level(rms: i % 2 == 0 ? 0.2 : 0.002)) }
+expect(loudTop > 0.9, "autogain: loud speech still reaches the top (\(loudTop))")
+var steady = AutoGain()
+var flatLevel: Float = 1
+for _ in 0..<300 { flatLevel = steady.level(rms: 0.001) }
+expect(flatLevel < 0.1, "autogain: steady noise alone is not a waveform (\(flatLevel))")
+
 if failures == 0 { print("core tests passed") } else { print("\(failures) failure(s)"); exit(1) }

@@ -195,7 +195,7 @@ final class DictationController: ObservableObject {
         }
     }
 
-    /// A failed dictation stays in History with its recording, so it can be played back or retried.
+    /// A failed dictation stays in History with its recording (for 5 minutes), so it can be retried.
     private func keepFailed(_ id: UUID, audioURL: URL, duration: Double, engine: String, error: String, details: TranscriptionDetails?) {
         HistoryStore.shared.add(HistoryEntry(id: id, date: Date(), text: "", rawText: "", engine: engine, durationSeconds: duration,
                                              audioFileName: audioURL.lastPathComponent, details: details, error: error))
@@ -250,7 +250,9 @@ final class DictationController: ObservableObject {
     // MARK: Files
 
     private var fileQueue: [URL] = []
-    private var fileRunning = false
+    private var fileTask: Task<Void, Never>?
+    /// A file is being read or transcribed (the menu offers Cancel while it is).
+    @Published private(set) var fileRunning = false
 
     /// Audio or video files from Finder (Services, Open With), a drop on one of our windows, or the menu's
     /// "Transcribe File…". Each becomes a History entry; the text goes to the clipboard. Runs one at a time, after
@@ -269,11 +271,21 @@ final class DictationController: ObservableObject {
         guard !fileRunning, !state.isActive, !fileQueue.isEmpty else { return }
         let url = fileQueue.removeFirst()
         fileRunning = true
-        Task { [weak self] in
+        fileTask = Task { [weak self] in
             await self?.transcribeFile(url)
             self?.fileRunning = false
+            self?.fileTask = nil
             self?.drainFileQueue()
         }
+    }
+
+    /// Stops the file in progress (after the current part) and forgets the ones waiting.
+    /// The part already with the engine finishes first (whisper.cpp can't be interrupted mid-decode), so the bar
+    /// says what's happening in the meantime.
+    func cancelFiles() {
+        fileQueue.removeAll()
+        if fileRunning { transcribingText = "Cancelling after this part…" }
+        fileTask?.cancel()
     }
 
     private func transcribeFile(_ url: URL) async {
@@ -287,6 +299,7 @@ final class DictationController: ObservableObject {
             show(failure: error.localizedDescription)
             return
         }
+        guard !Task.isCancelled else { state = .idle; bar.hide(); return }
         let duration = Double(samples.count) / AudioRecorder.sampleRate
         guard duration > 0.35 else {
             show(failure: "\(url.lastPathComponent) has no sound in it.")
@@ -295,9 +308,12 @@ final class DictationController: ObservableObject {
         let entryID = UUID()
         let audioURL = HistoryStore.shared.newAudioURL(id: entryID)
         try? AudioRecorder.wavData(from: samples).write(to: audioURL, options: [.atomic, .completeFileProtection])
-        transcribingText = "Transcribing \(url.lastPathComponent)…"
+        let name = url.lastPathComponent
+        transcribingText = "Transcribing \(name)…"
         do {
-            let outcome = try await TranscriptionService().transcribe(samples: samples, profile: .standard)
+            let outcome = try await TranscriptionService().transcribeLong(samples: samples, profile: .standard) { [weak self] done, total in
+                self?.transcribingText = "Transcribing \(name) · part \(done + 1) of \(total)"
+            }
             if TextCleanup.isHallucination(outcome.text) {
                 keepFailed(entryID, audioURL: audioURL, duration: duration, engine: outcome.engine, error: "Didn't catch anything in \(url.lastPathComponent).", details: outcome.details)
                 show(failure: "Didn't catch anything in \(url.lastPathComponent).")
@@ -312,6 +328,12 @@ final class DictationController: ObservableObject {
             state = .done
             scheduleHide(after: 2.5)
         } catch {
+            if Task.isCancelled || error is CancellationError {  // Cancel File Transcription: leave nothing behind
+                try? FileManager.default.removeItem(at: audioURL)
+                state = .idle
+                bar.hide()
+                return
+            }
             keepFailed(entryID, audioURL: audioURL, duration: duration, engine: settings.engineLine, error: Self.friendly(error.localizedDescription), details: nil)
             show(failure: error.localizedDescription)
         }

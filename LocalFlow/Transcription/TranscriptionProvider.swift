@@ -93,7 +93,7 @@ enum HTTP {
     static let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.timeoutIntervalForRequest = 60
-        config.timeoutIntervalForResource = 120
+        config.timeoutIntervalForResource = 300  // a 5-minute part of a long file takes a while to upload and transcribe
         config.waitsForConnectivity = false
         return URLSession(configuration: config)
     }()

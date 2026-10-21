@@ -13,6 +13,7 @@ final class AudioRecorder: ObservableObject {
     @Published private(set) var levels: [Float] = Array(repeating: 0, count: 24)
     /// Level while the Settings mic test is open; audio is not kept.
     @Published private(set) var monitorLevel: Float = 0
+    private var gain = AutoGain()
     private var monitoring = false
     private var resumeMonitoring = false
     private var monitorCancellable: AnyCancellable?
@@ -41,6 +42,7 @@ final class AudioRecorder: ObservableObject {
     }
 
     func start() throws {
+        gain.reset()
         guard !isRecording else { return }
         resumeMonitoring = monitoring
         stopMonitoring()
@@ -81,7 +83,8 @@ final class AudioRecorder: ObservableObject {
             guard let self, let mono = Self.mixedToMono(buffer), let data = mono.floatChannelData, mono.frameLength > 0 else { return }
             let chunk = UnsafeBufferPointer(start: data[0], count: Int(mono.frameLength))
             let rms = sqrt(chunk.reduce(0) { $0 + $1 * $1 } / Float(chunk.count))
-            let normalized = min(1, max(0, (20 * log10(max(rms, 1e-6)) + 50) / 50))
+            // The Settings meter is a true reading on a fixed scale (−60…−10 dB), unlike the bar's auto-gained waveform.
+            let normalized = min(1, max(0, (20 * log10(max(rms, 1e-6)) + 60) / 50))
             DispatchQueue.main.async { self.monitorLevel = self.monitorLevel * 0.5 + normalized * 0.5 }
         }
         engine.prepare()
@@ -142,8 +145,8 @@ final class AudioRecorder: ObservableObject {
         let chunk = Array(UnsafeBufferPointer(start: data[0], count: Int(out.frameLength)))
         lock.lock(); samples.append(contentsOf: chunk); lock.unlock()
         let rms = sqrt(chunk.reduce(0) { $0 + $1 * $1 } / Float(chunk.count))
-        let normalized = min(1, max(0, (20 * log10(max(rms, 1e-6)) + 50) / 50))
         DispatchQueue.main.async {
+            let normalized = self.gain.level(rms: rms)
             self.level = self.level * 0.6 + normalized * 0.4
             self.levels.removeFirst()
             self.levels.append(self.level)

@@ -20,6 +20,9 @@ struct LocalFlowApp: App {
             Button("Retry Last Dictation") { controller.retryLast() }
                 .disabled(controller.lastEntry?.audioFileName == nil || controller.state.isActive)
             Button("Transcribe File…") { FilePicker.chooseAndTranscribe() }
+            if controller.fileRunning {
+                Button("Cancel File Transcription") { controller.cancelFiles() }
+            }
             Divider()
             Button("Check for Updates…") { UpdateChecker.shared.check(userInitiated: true) }
             Button("Run Setup Again…") { WindowManager.shared.showOnboarding() }
@@ -149,7 +152,6 @@ final class WindowManager {
         windows[key] = window
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
-            if key == "history" { HistoryPlayer.shared.stop() }
             if self?.windows.isEmpty == true { NSApp.setActivationPolicy(.accessory) }
         }
         return window
