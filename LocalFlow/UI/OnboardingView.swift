@@ -44,6 +44,7 @@ struct OnboardingView: View {
         .padding(.bottom, 24)
         .frame(width: Self.windowSize.width, height: Self.windowSize.height)
         .animation(.easeInOut(duration: 0.2), value: step)
+        .transcribesDroppedFiles()
     }
 
     // MARK: Footer

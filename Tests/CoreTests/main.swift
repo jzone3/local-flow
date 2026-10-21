@@ -353,4 +353,26 @@ var longDetails = TranscriptionDetails(mode: .local, seconds: 90, finalFrom: "Wh
 longDetails.parts = 12
 expect(longDetails.text.hasPrefix("Transcribed in 12 parts of up to 5 minutes; the lines below are for part 1.\nLocal · Whisper Tiny · 90 s"), "details: parts line")
 
+
+// AutoGain: a quiet microphone still moves the waveform
+var quiet = AutoGain()
+var quietLevels: [Float] = []
+for i in 0..<400 {
+    // room noise at -58 dB, speech bursts at -44 dB (an input volume of ~25%)
+    let speaking = (i / 40) % 2 == 1
+    quietLevels.append(quiet.level(rms: speaking ? 0.0063 : 0.0013))
+}
+let quietSpeech = quietLevels.enumerated().filter { ($0.offset / 40) % 2 == 1 }.map(\.element)
+let quietNoise = quietLevels.enumerated().filter { ($0.offset / 40) % 2 == 0 }.map(\.element).dropFirst(40)
+expect((quietSpeech.max() ?? 0) > 0.7, "autogain: quiet speech fills the bars (\(quietSpeech.max() ?? 0))")
+expect((quietNoise.max() ?? 1) < 0.25, "autogain: room noise between words stays low (\(quietNoise.max() ?? 1))")
+var loud = AutoGain()
+var loudTop: Float = 0
+for i in 0..<200 { loudTop = max(loudTop, loud.level(rms: i % 2 == 0 ? 0.2 : 0.002)) }
+expect(loudTop > 0.9, "autogain: loud speech still reaches the top (\(loudTop))")
+var flat = AutoGain()
+var flatLevel: Float = 1
+for _ in 0..<300 { flatLevel = flat.level(rms: 0.001) }
+expect(flatLevel < 0.1, "autogain: steady noise alone is not a waveform (\(flatLevel))")
+
 if failures == 0 { print("core tests passed") } else { print("\(failures) failure(s)"); exit(1) }
