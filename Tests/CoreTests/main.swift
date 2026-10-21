@@ -370,9 +370,9 @@ var loud = AutoGain()
 var loudTop: Float = 0
 for i in 0..<200 { loudTop = max(loudTop, loud.level(rms: i % 2 == 0 ? 0.2 : 0.002)) }
 expect(loudTop > 0.9, "autogain: loud speech still reaches the top (\(loudTop))")
-var flat = AutoGain()
+var steady = AutoGain()
 var flatLevel: Float = 1
-for _ in 0..<300 { flatLevel = flat.level(rms: 0.001) }
+for _ in 0..<300 { flatLevel = steady.level(rms: 0.001) }
 expect(flatLevel < 0.1, "autogain: steady noise alone is not a waveform (\(flatLevel))")
 
 if failures == 0 { print("core tests passed") } else { print("\(failures) failure(s)"); exit(1) }
