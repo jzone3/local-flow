@@ -324,11 +324,13 @@ final class DictationController: ObservableObject {
             lastWarning = Self.copiedMessage
             state = .done
             scheduleHide(after: 2.5)
-        } catch is CancellationError {
-            try? FileManager.default.removeItem(at: audioURL)
-            state = .idle
-            bar.hide()
         } catch {
+            if Task.isCancelled || error is CancellationError {  // Cancel File Transcription: leave nothing behind
+                try? FileManager.default.removeItem(at: audioURL)
+                state = .idle
+                bar.hide()
+                return
+            }
             keepFailed(entryID, audioURL: audioURL, duration: duration, engine: settings.engineLine, error: Self.friendly(error.localizedDescription), details: nil)
             show(failure: error.localizedDescription)
         }
