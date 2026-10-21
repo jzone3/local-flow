@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import ServiceManagement
 
 enum EngineMode: String, CaseIterable, Identifiable {
     case local, cloud
@@ -37,6 +38,14 @@ final class AppSettings: ObservableObject {
     @Published var onboardingDone: Bool { didSet { defaults.set(onboardingDone, forKey: "onboardingDone") } }
 
     static let historyRetention: TimeInterval = 12 * 60 * 60
+
+    /// Stock macOS login item (System Settings → General → Login Items lists it). Turned on when setup finishes.
+    var openAtLogin: Bool { SMAppService.mainApp.status == .enabled }
+
+    func setOpenAtLogin(_ on: Bool) {
+        objectWillChange.send()
+        do { try on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() } catch { NSLog("Login item: \(error)") }
+    }
 
     private init() {
         engineMode = EngineMode(rawValue: defaults.string(forKey: "engineMode") ?? "") ?? .local
