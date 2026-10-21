@@ -49,6 +49,11 @@ struct GeneralSettings: View {
             Section("Feedback") {
                 Toggle("Play a sound when recording starts and stops", isOn: $settings.playSounds)
             }
+            Section("Startup") {
+                Toggle("Open at login", isOn: Binding(get: { settings.openAtLogin }, set: { settings.setOpenAtLogin($0) }))
+                Text("Local Flow is a menu bar app; this puts it back in the menu bar after a restart.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Permissions") {
                 if let problem = controller.permissionProblem {
                     Label { Text(problem) } icon: { Icon("warning", size: 14) }.foregroundStyle(.orange)

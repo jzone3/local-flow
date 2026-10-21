@@ -74,6 +74,7 @@ struct OnboardingView: View {
                     Button("Start Dictating") {
                         settings.onboardingDone = true
                         if !settings.playSoundsChosen { settings.playSounds = false }
+                        settings.setOpenAtLogin(true)
                         LocalWhisper.shared.preload()
                         WindowManager.shared.close("onboarding")
                     }
