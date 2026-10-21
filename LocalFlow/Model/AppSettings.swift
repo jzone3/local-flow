@@ -38,6 +38,8 @@ final class AppSettings: ObservableObject {
     @Published var onboardingDone: Bool { didSet { defaults.set(onboardingDone, forKey: "onboardingDone") } }
 
     static let historyRetention: TimeInterval = 12 * 60 * 60
+    /// Voice recordings live only long enough for a Retry; the text stays until quit or the 12 hours.
+    static let audioRetention: TimeInterval = 5 * 60
 
     /// Stock macOS login item (System Settings → General → Login Items lists it). Turned on when setup finishes.
     var openAtLogin: Bool { SMAppService.mainApp.status == .enabled }

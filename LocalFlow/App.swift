@@ -152,7 +152,6 @@ final class WindowManager {
         windows[key] = window
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
-            if key == "history" { HistoryPlayer.shared.stop() }
             if self?.windows.isEmpty == true { NSApp.setActivationPolicy(.accessory) }
         }
         return window

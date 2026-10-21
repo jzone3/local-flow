@@ -13,7 +13,7 @@ You speak faster than you type. Local Flow keeps all voice dictation private. No
 - **Files too.** Drop an audio or video file on the Settings/History window (or click *Choose File…*), right-click it in Finder → Services → *Transcribe with Local Flow*, or use *Transcribe File…* in the menu bar: the transcript lands in History and on your clipboard. Long recordings are cut at pauses into parts of up to 5 minutes (cloud services cap uploads at 20–25 MB), transcribed one after another with progress on the bar, and joined; *Cancel File Transcription* in the menu bar stops it.
 - **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup lets you add word packs for your field (engineering, product, sales, legal…).
 - **Cleanup that never leaves your Mac.** Ums and uhs, capitalization, punctuation and "new paragraph" are handled with rules, not a model. It also knows where you are typing: terminals, code editors and browser address bars get lowercase with no sentence punctuation (`git status`, `example.com`); chat apps skip the final period. On by default, one toggle to turn off.
-- **Short-lived history.** Transcripts and recordings stay on your Mac only while the app is running — wiped when you quit (and on launch), and never kept longer than 12 hours.
+- **Short-lived history.** Transcripts stay on your Mac only while the app is running — wiped when you quit (and on launch), and never kept longer than 12 hours. The voice recording behind each one is deleted after 5 minutes (long enough for a Retry) and can't be played back in the app.
 - **Self-updating.** Checks GitHub Releases once a day and installs the new DMG in place.
 
 ## Install
@@ -59,7 +59,7 @@ Local engines work the same way: `LocalWhisper` is just another `TranscriptionPr
 - Local mode: audio and text never leave the Mac.
 - Cloud mode: only the audio clip and the dictionary hint go to the provider you chose, using your key (stored in the Keychain). Mixture of experts sends the same clip to every service you have a key for, and their transcripts (text only) to OpenAI for merging. Local Flow has no server and keeps no logs; the providers may keep what you send under their own terms.
 - Cleanup and spelling fixes are deterministic and on-device. There is no LLM cleanup pass.
-- History (`~/Library/Application Support/Local Flow/History`) is one `history.json` plus one `.wav` per dictation, nothing else. The whole folder is emptied when the app quits and again at launch (so a crash leaves nothing behind); Delete removes files right away; while running, the 12-hour purge runs every 5 minutes, on wake and whenever the app comes to the front, and also removes orphaned audio. The folder is excluded from Time Machine so backups never keep a copy.
+- History (`~/Library/Application Support/Local Flow/History`) is one `history.json` plus one `.wav` per dictation, nothing else. The whole folder is emptied when the app quits and again at launch (so a crash leaves nothing behind); Delete removes files right away; while running, the purge runs every minute (recordings go after 5 minutes, text after 12 hours), on wake and whenever the app comes to the front, and also removes orphaned audio. The folder is excluded from Time Machine so backups never keep a copy.
 - Transcripts are pasted through the pasteboard, which is restored 0.6 s later; a third-party clipboard manager could still record them, as with any dictation app.
 
 ## Uninstall

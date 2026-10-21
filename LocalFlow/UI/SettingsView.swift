@@ -628,7 +628,7 @@ struct PrivacySettings: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("History") {
-                Text("Transcripts and recordings are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way.")
+                Text("Transcripts are kept only on this Mac, only while Local Flow is running. Quitting deletes them; nothing lives longer than 12 hours either way. The voice recording itself is deleted 5 minutes after each dictation, so it can be retried but never played back.")
                     .font(.caption).foregroundStyle(.secondary)
                 Text("To transcribe a recording or a video, drop the file on this window or click Choose File…; or right-click it in Finder → Services → Transcribe with Local Flow. Long files go in 5-minute parts; the menu bar shows progress and offers Cancel.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -637,7 +637,7 @@ struct PrivacySettings: View {
                     Spacer()
                     Button("Choose File…") { FilePicker.chooseAndTranscribe() }
                         .actionButton()
-                    Button("Delete All Now", role: .destructive) { HistoryPlayer.shared.stop(); history.clear() }
+                    Button("Delete All Now", role: .destructive) { history.clear() }
                         .actionButton()
                         .disabled(history.entries.isEmpty)
                 }

@@ -36,7 +36,7 @@ final class HistoryStore: ObservableObject {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         excludeFromBackups()
         wipe()
-        purgeTimer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { [weak self] _ in self?.purge() }
+        purgeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.purge() }
         for name in [NSApplication.didBecomeActiveNotification, NSWorkspace.didWakeNotification] {
             let center = name == NSWorkspace.didWakeNotification ? NSWorkspace.shared.notificationCenter : NotificationCenter.default
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.purge() }
@@ -96,14 +96,20 @@ final class HistoryStore: ObservableObject {
     }
 
     /// Drops everything older than the retention window, including audio files with no index entry.
-    func purge(now: Date = Date(), retention: TimeInterval = AppSettings.historyRetention) {
+    /// Drops everything older than the retention window, and the voice recording of anything older than
+    /// `AppSettings.audioRetention` (the text stays; Retry goes away with the file).
+    func purge(now: Date = Date(), retention: TimeInterval = AppSettings.historyRetention,
+               audioRetention: TimeInterval = AppSettings.audioRetention) {
         let cutoff = now.addingTimeInterval(-retention)
+        let audioCutoff = now.addingTimeInterval(-audioRetention)
         let expired = entries.filter { $0.date < cutoff }
-        guard !expired.isEmpty || hasOrphans(olderThan: cutoff) else { return }
-        expired.forEach { if let url = audioURL(for: $0) { try? FileManager.default.removeItem(at: url) } }
+        let stale = entries.filter { $0.date < audioCutoff && $0.audioFileName != nil }
+        guard !expired.isEmpty || !stale.isEmpty || hasOrphans(olderThan: audioCutoff) else { return }
+        (expired + stale).forEach { if let url = audioURL(for: $0) { try? FileManager.default.removeItem(at: url) } }
         entries.removeAll { $0.date < cutoff }
+        for index in entries.indices where entries[index].date < audioCutoff { entries[index].audioFileName = nil }
         save()
-        purgeOrphans(olderThan: cutoff)
+        purgeOrphans(olderThan: audioCutoff)
     }
 
     private func hasOrphans(olderThan cutoff: Date) -> Bool {

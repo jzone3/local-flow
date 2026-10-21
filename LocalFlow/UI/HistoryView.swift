@@ -1,33 +1,5 @@
-import AVFoundation
 import SwiftUI
 import UniformTypeIdentifiers
-
-/// Plays one history recording at a time, inline; stops when the row, the entry or the window goes away.
-final class HistoryPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
-    static let shared = HistoryPlayer()
-    @Published private(set) var playingID: UUID?
-    private var player: AVAudioPlayer?
-
-    func toggle(_ url: URL, id: UUID) {
-        if playingID == id { stop(); return }
-        stop()
-        guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
-        player.delegate = self
-        self.player = player
-        playingID = id
-        player.play()
-    }
-
-    func stop() {
-        player?.stop()
-        player = nil
-        playingID = nil
-    }
-
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        DispatchQueue.main.async { if self.player === player { self.stop() } }
-    }
-}
 
 struct HistoryView: View {
     @ObservedObject private var history = HistoryStore.shared
@@ -35,7 +7,7 @@ struct HistoryView: View {
     var body: some View {
         VStack(spacing: 0) {
             if history.entries.isEmpty {
-                ContentUnavailableView { Label { Text("Nothing yet") } icon: { Icon("history", size: 44).foregroundStyle(.secondary) } } description: { Text("Dictations from this session show up here and are gone when you quit, or after 12 hours.") }
+                ContentUnavailableView { Label { Text("Nothing yet") } icon: { Icon("history", size: 44).foregroundStyle(.secondary) } } description: { Text("Dictations from this session show up here and are gone when you quit, or after 12 hours. Voice recordings are deleted after 5 minutes.") }
                     .frame(maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -44,11 +16,11 @@ struct HistoryView: View {
             }
             Divider()
             HStack {
-                Text("Kept on this Mac only. Gone when you quit, or after 12 hours. Drop an audio or video file here to transcribe it.").font(.caption).foregroundStyle(.secondary)
+                Text("Kept on this Mac only. Text goes when you quit or after 12 hours; the voice recording is deleted after 5 minutes. Drop an audio or video file here to transcribe it.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Choose File…") { FilePicker.chooseAndTranscribe() }
                     .actionButton()
-                Button("Delete All", role: .destructive) { HistoryPlayer.shared.stop(); history.clear() }
+                Button("Delete All", role: .destructive) { history.clear() }
                     .actionButton()
                     .disabled(history.entries.isEmpty)
             }
@@ -117,7 +89,6 @@ struct HistoryList: View {
 private struct HistoryRow: View {
     let entry: HistoryEntry
     @ObservedObject var history: HistoryStore
-    @ObservedObject private var player = HistoryPlayer.shared
     @ObservedObject private var controller = DictationController.shared
 
     var body: some View {
@@ -143,7 +114,7 @@ private struct HistoryRow: View {
                 Spacer()
                 if entry.audioFileName != nil {
                     Button("Retry") { controller.retry(entry) }
-                        .help(entry.failed ? "Transcribe this recording again" : "Transcribe again; the result goes to the clipboard")
+                        .help(entry.failed ? "Transcribe this recording again (the recording is kept 5 minutes)" : "Transcribe again; the result goes to the clipboard")
                         .disabled(controller.state.isActive)
                 }
                 if !entry.failed {
@@ -152,13 +123,7 @@ private struct HistoryRow: View {
                         NSPasteboard.general.setString(entry.text, forType: .string)
                     }
                 }
-                if let url = history.audioURL(for: entry), FileManager.default.fileExists(atPath: url.path) {
-                    Button(player.playingID == entry.id ? "Stop" : "Play") { player.toggle(url, id: entry.id) }
-                }
-                Button("Delete", role: .destructive) {
-                    if player.playingID == entry.id { player.stop() }
-                    history.remove(entry)
-                }
+                Button("Delete", role: .destructive) { history.remove(entry) }
             }
             .font(.caption).foregroundStyle(.secondary)
             .lineLimit(1)

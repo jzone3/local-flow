@@ -195,7 +195,7 @@ final class DictationController: ObservableObject {
         }
     }
 
-    /// A failed dictation stays in History with its recording, so it can be played back or retried.
+    /// A failed dictation stays in History with its recording (for 5 minutes), so it can be retried.
     private func keepFailed(_ id: UUID, audioURL: URL, duration: Double, engine: String, error: String, details: TranscriptionDetails?) {
         HistoryStore.shared.add(HistoryEntry(id: id, date: Date(), text: "", rawText: "", engine: engine, durationSeconds: duration,
                                              audioFileName: audioURL.lastPathComponent, details: details, error: error))
