@@ -34,5 +34,45 @@
 	<string>Local Flow records your voice while you hold the hotkey so it can type what you said.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Local Flow pastes the transcript into the app you are using.</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Audio or video</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>None</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.audio</string>
+				<string>public.movie</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Transcribe with Local Flow</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>transcribeFiles</string>
+			<key>NSPortName</key>
+			<string>Local Flow</string>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.audio</string>
+				<string>public.movie</string>
+			</array>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

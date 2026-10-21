@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Plays one history recording at a time, inline; stops when the row, the entry or the window goes away.
 final class HistoryPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate {
@@ -43,7 +44,7 @@ struct HistoryView: View {
             }
             Divider()
             HStack {
-                Text("Kept on this Mac only. Gone when you quit, or after 12 hours.").font(.caption).foregroundStyle(.secondary)
+                Text("Kept on this Mac only. Gone when you quit, or after 12 hours. Drop an audio or video file here to transcribe it.").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button("Delete All", role: .destructive) { HistoryPlayer.shared.stop(); history.clear() }
                     .actionButton()
@@ -52,6 +53,22 @@ struct HistoryView: View {
             .padding(12)
         }
         .onAppear { history.purge() }
+        .transcribesDroppedFiles()
+    }
+}
+
+extension View {
+    /// Any of our windows accepts an audio/video file dropped on it and transcribes it into History.
+    func transcribesDroppedFiles() -> some View {
+        onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            for provider in providers {
+                provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier) { item, _ in
+                    guard let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
+                    DispatchQueue.main.async { DictationController.shared.transcribeFiles([url]) }
+                }
+            }
+            return !providers.isEmpty
+        }
     }
 }
 
@@ -82,6 +99,10 @@ private struct HistoryRow: View {
             } else {
                 Text(entry.text).textSelection(.enabled)
             }
+            if let source = entry.source {
+                Label { Text(source).lineLimit(1).truncationMode(.middle) } icon: { Icon("text-lines", size: 11) }
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             HStack(spacing: 8) {
                 Text(entry.date, style: .relative) + Text(" ago")
                 if !entry.failed {
@@ -92,7 +113,8 @@ private struct HistoryRow: View {
                 Text(String(format: "%.0fs", entry.durationSeconds))
                 Spacer()
                 if entry.audioFileName != nil {
-                    Button(entry.failed ? "Retry" : "Retry → clipboard") { controller.retry(entry) }
+                    Button("Retry") { controller.retry(entry) }
+                        .help(entry.failed ? "Transcribe this recording again" : "Transcribe again; the result goes to the clipboard")
                         .disabled(controller.state.isActive)
                 }
                 if !entry.failed {
@@ -110,6 +132,7 @@ private struct HistoryRow: View {
                 }
             }
             .font(.caption).foregroundStyle(.secondary)
+            .lineLimit(1)
             .actionButton()
             .controlSize(.small)
             if let details = entry.details {
