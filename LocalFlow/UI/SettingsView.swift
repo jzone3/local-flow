@@ -598,11 +598,9 @@ struct DictionarySettings: View {
                 .font(.caption).foregroundStyle(.secondary)
             Text("Word packs").font(.subheadline).fontWeight(.medium).padding(.top, 4)
             PackPicker(columns: 2)
-            TextEditor(text: $settings.vocabularyText)
-                .font(.system(.body, design: .monospaced))
+            VocabularyEditor(text: $settings.vocabularyText)
                 .frame(minHeight: 240)
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
-                .background(FileDropPassthrough())
             HStack {
                 Text(settings.vocabulary.terms.count == 1 ? "1 term" : "\(settings.vocabulary.terms.count) terms").font(.caption).foregroundStyle(.secondary)
                 Spacer()
@@ -809,30 +807,73 @@ struct FlowLayout: Layout {
     }
 }
 
-/// A TextEditor is an NSTextView, which takes a dropped file itself and pastes its path into the text. Taking
-/// file URLs out of its drag types lets the drop fall through to the window's "Drop to transcribe" target.
-private struct FileDropPassthrough: NSViewRepresentable {
-    func makeNSView(context: Context) -> Finder { Finder() }
-    func updateNSView(_ view: Finder, context: Context) { view.apply() }
+/// Our own NSTextView for the dictionary, because SwiftUI's TextEditor takes every dropped file itself and pastes
+/// its path into the text. Here a dropped file goes to transcription, like a drop anywhere else on the window.
+private struct VocabularyEditor: NSViewRepresentable {
+    @Binding var text: String
 
-    final class Finder: NSView {
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            DispatchQueue.main.async { [weak self] in self?.apply() }
-        }
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.borderType = .noBorder
+        let textView = FileDroppingTextView()
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.usesFindBar = true
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        textView.textContainerInset = NSSize(width: 4, height: 6)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.minSize = .zero
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        textView.string = text
+        scroll.documentView = textView
+        return scroll
+    }
 
-        func apply() {
-            guard let root = window?.contentView else { return }
-            for textView in root.descendants(of: NSTextView.self)
-            where !textView.isFieldEditor && textView.registeredDraggedTypes.contains(.fileURL) {
-                textView.registerForDraggedTypes(textView.registeredDraggedTypes.filter { $0 != .fileURL })
-            }
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard let textView = scroll.documentView as? NSTextView, textView.string != text else { return }
+        textView.string = text
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(text: $text) }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var text: Binding<String>
+        init(text: Binding<String>) { self.text = text }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            text.wrappedValue = textView.string
         }
     }
-}
 
-private extension NSView {
-    func descendants<T: NSView>(of type: T.Type) -> [T] {
-        subviews.flatMap { view -> [T] in ((view as? T).map { [$0] } ?? []) + view.descendants(of: type) }
+    final class FileDroppingTextView: NSTextView {
+        private func files(in sender: NSDraggingInfo) -> [URL] {
+            (sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        }
+
+        override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+            files(in: sender).isEmpty ? super.draggingEntered(sender) : .copy
+        }
+
+        override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+            files(in: sender).isEmpty ? super.draggingUpdated(sender) : .copy
+        }
+
+        override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+            let urls = files(in: sender)
+            guard !urls.isEmpty else { return super.performDragOperation(sender) }
+            DictationController.shared.transcribeFiles(urls)
+            return true
+        }
     }
 }
