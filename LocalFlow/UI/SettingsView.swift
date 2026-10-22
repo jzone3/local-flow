@@ -91,7 +91,7 @@ struct TranscriptionSettings: View {
                 .pickerStyle(.segmented)
                 Text(settings.engineMode == .local
                      ? "Audio never leaves this Mac. Whisper runs on your GPU."
-                     : "Audio is sent to the provider you pick with your own key. Nothing else is shared.")
+                     : "Your audio and dictionary words go only to the services below, with your own keys.")
                     .font(.caption).foregroundStyle(.secondary)
                 Picker("Language", selection: $settings.language) {
                     Text("Detect automatically").tag("auto")
@@ -117,69 +117,46 @@ struct TranscriptionSettings: View {
 
 struct CloudSettings: View {
     @ObservedObject private var settings = AppSettings.shared
-    @State private var keyChanged = 0  // bumps so the "Key stored" line re-reads the Keychain
-
-    private var provider: CloudProviderID { settings.cloudProvider }
+    @State private var keyChanged = 0  // bumps so the key rows and captions re-read the Keychain
 
     var body: some View {
-        Section("Provider") {
-            Picker("Service", selection: $settings.cloudProviderID) {
-                ForEach(CloudProviderID.allCases) { Text($0.title).tag($0.rawValue) }
-            }
-            Picker("Model", selection: Binding(get: { settings.cloudModel(for: provider) },
-                                               set: { settings.setCloudModel($0, for: provider) })) {
-                ForEach(provider.models, id: \.id) { Text($0.title).tag($0.id) }
-            }
-            ProviderKeyRow(provider: provider, found: EnvironmentKeys.scan().first { provider.environmentVariables.contains($0.name) },
-                           showsRemove: true) { keyChanged += 1 }
-                .id("\(provider.rawValue)-\(keyChanged)")
-        }
         Section {
-            MixtureOfExpertsToggle()
+            Toggle(MixtureOfExperts.title, isOn: $settings.mixtureOfExperts)
+            Text(mixtureCaption)
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 .id(keyChanged)
         }
-        Section("What gets sent") {
-            WhatGetsSent()
-                .id(keyChanged)
-        }
-    }
-}
-
-/// Exactly what leaves this Mac in Cloud mode, per service, so the user can check it before dictating.
-struct WhatGetsSent: View {
-    @ObservedObject private var settings = AppSettings.shared
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if settings.mixtureOfExperts {
-                Text("Your audio clip (16 kHz WAV) and your dictionary words go to every service below that has a key, each with its own key. Nothing else.")
-                ForEach(CloudProviderID.allCases) { provider in
-                    let keyed = provider.apiKey != nil
-                    Text("\(keyed ? "✓" : "–") \(provider.title) · \(provider.modelTitle(settings.cloudModel(for: provider)))\(keyed ? "" : " · no key, skipped")")
-                        .foregroundStyle(keyed ? .primary : .secondary)
-                }
-                if CloudProviderID.openAI.apiKey != nil {
-                    Text("Then the transcripts (not the audio) and your dictionary words go to OpenAI \(OpenAIChat.mergeModel), which merges them.")
-                } else {
-                    Text("Needs an OpenAI key to merge; without one the best single transcript is used as is.")
-                }
-            } else {
-                let provider = settings.cloudProvider
-                Text("Your audio clip (16 kHz WAV) and your dictionary words go to \(provider.title) (\(provider.modelTitle(settings.cloudModel(for: provider)))) with your key. Nothing else.")
+        if settings.mixtureOfExperts {
+            ForEach(CloudProviderID.allCases) { provider in
+                Section { providerRows(provider) }
             }
-            Text(fallbackLine)
+        } else {
+            Section("Service") {
+                Picker("Service", selection: $settings.cloudProviderID) {
+                    ForEach(CloudProviderID.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                providerRows(settings.cloudProvider)
+            }
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var fallbackLine: String {
-        let model = WhisperModel.active
-        guard settings.fallbackToLocal else { return "If the cloud fails, nothing is pasted (local fallback is off)." }
-        return model.isDownloaded
-            ? "If the cloud fails, Whisper \(model.title) on this Mac transcribes instead."
-            : "If the cloud fails, nothing is pasted: the local fallback model (\(model.title)) isn't downloaded."
+    @ViewBuilder
+    private func providerRows(_ provider: CloudProviderID) -> some View {
+        ProviderKeyRow(provider: provider, found: EnvironmentKeys.scan().first { provider.environmentVariables.contains($0.name) },
+                       showsRemove: true) { keyChanged += 1 }
+            .id("\(provider.rawValue)-\(keyChanged)")
+        Picker("Model", selection: Binding(get: { settings.cloudModel(for: provider) },
+                                           set: { settings.setCloudModel($0, for: provider) })) {
+            ForEach(provider.models, id: \.id) { Text($0.title).tag($0.id) }
+        }
+    }
+
+    private var mixtureCaption: String {
+        guard settings.mixtureOfExperts else { return "Off: one service transcribes. On: every service with a key transcribes, then OpenAI merges the results." }
+        return CloudProviderID.openAI.apiKey == nil
+            ? "Every service below with a key transcribes. Add an OpenAI key to merge the results; until then the best single transcript is used."
+            : "Every service below with a key transcribes, then OpenAI \(OpenAIChat.mergeModel) merges the transcripts (not the audio)."
     }
 }
 
