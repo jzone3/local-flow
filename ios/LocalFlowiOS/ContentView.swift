@@ -93,13 +93,13 @@ struct ListeningBar: View {
 
     // The Mac bar's sizes (24 pt row, 16/8 padding, 170 pt waveform) scaled up for a thumb.
     static let rowHeight: CGFloat = 32
+    // One size for every state, so the bar never jumps.
+    static let size = CGSize(width: 340, height: 64)
 
     var body: some View {
         content
             .frame(height: Self.rowHeight)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
-            .frame(minWidth: 260)
+            .frame(width: Self.size.width, height: Self.size.height)
             .background(Capsule().fill(Color.black))
             .overlay(Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1))
             .shadow(color: .black.opacity(0.25), radius: 18, y: 6)
@@ -107,7 +107,7 @@ struct ListeningBar: View {
             .scaleEffect(pressing ? 0.96 : 1)
             .animation(.easeOut(duration: 0.12), value: pressing)
             .animation(.spring(duration: 0.3), value: dictation.phase)
-            .contentShape(Capsule())
+            .frame(width: Self.size.width, height: Self.size.height)
             .overlay(PressArea { down in
                 if down {
                     guard !pressing, dictation.phase != .transcribing else { return }
@@ -118,6 +118,11 @@ struct ListeningBar: View {
                     dictation.pressEnded()
                 }
             })
+            .onReceive(NotificationCenter.default.publisher(for: ReleaseRecognizer.allTouchesEnded)) { _ in
+                guard pressing else { return }
+                pressing = false
+                dictation.pressEnded()
+            }
             .accessibilityElement()
             .accessibilityLabel(dictation.isListening ? "Stop" : "Start dictation")
             .accessibilityAddTraits(.isButton)
@@ -151,8 +156,8 @@ struct ListeningBar: View {
     }
 }
 
-/// Raw touch down/up from UIKit. A SwiftUI drag gesture here lost its release once listening started, so
-/// hold-to-talk kept listening after the finger came up.
+/// Touch down on the bar, from UIKit. SwiftUI swaps this view for a new one when listening starts, so the original
+/// view never hears the finger lift; the release comes from `ReleaseRecognizer` on the window instead.
 private struct PressArea: UIViewRepresentable {
     var onChange: (Bool) -> Void
 
@@ -162,9 +167,36 @@ private struct PressArea: UIViewRepresentable {
     final class TouchView: UIView {
         var onChange: (Bool) -> Void = { _ in }
 
+        override func didMoveToWindow() {
+            guard let window, !(window.gestureRecognizers ?? []).contains(where: { $0 is ReleaseRecognizer }) else { return }
+            window.addGestureRecognizer(ReleaseRecognizer())
+        }
+
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { onChange(true) }
         override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) { onChange(false) }
         override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { onChange(false) }
+    }
+}
+
+/// Watches every touch in the window without ever recognizing (so it never blocks anything) and posts when the
+/// last finger lifts.
+final class ReleaseRecognizer: UIGestureRecognizer {
+    static let allTouchesEnded = Notification.Name("LocalFlowAllTouchesEnded")
+
+    init() {
+        super.init(target: nil, action: nil)
+        cancelsTouchesInView = false
+        delaysTouchesEnded = false
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) { finish(event) }
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) { finish(event) }
+
+    private func finish(_ event: UIEvent) {
+        let lifted = event.allTouches?.allSatisfy { $0.phase == .ended || $0.phase == .cancelled } ?? true
+        guard lifted else { return }
+        NotificationCenter.default.post(name: Self.allTouchesEnded, object: nil)
+        state = .failed
     }
 }
 
