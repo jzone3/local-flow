@@ -129,10 +129,10 @@ struct CloudSettings: View {
         }
         if settings.mixtureOfExperts {
             ForEach(CloudProviderID.allCases) { provider in
-                Section { providerRows(provider) }
+                Section { providerRows(provider, modelOnlyWithKey: true) }
             }
         } else {
-            Section("Service") {
+            Section {
                 Picker("Service", selection: $settings.cloudProviderID) {
                     ForEach(CloudProviderID.allCases) { Text($0.title).tag($0.rawValue) }
                 }
@@ -142,21 +142,24 @@ struct CloudSettings: View {
     }
 
     @ViewBuilder
-    private func providerRows(_ provider: CloudProviderID) -> some View {
+    private func providerRows(_ provider: CloudProviderID, modelOnlyWithKey: Bool = false) -> some View {
         ProviderKeyRow(provider: provider, found: EnvironmentKeys.scan().first { provider.environmentVariables.contains($0.name) },
                        showsRemove: true) { keyChanged += 1 }
             .id("\(provider.rawValue)-\(keyChanged)")
-        Picker("Model", selection: Binding(get: { settings.cloudModel(for: provider) },
-                                           set: { settings.setCloudModel($0, for: provider) })) {
-            ForEach(provider.models, id: \.id) { Text($0.title).tag($0.id) }
+        if !modelOnlyWithKey || provider.apiKey != nil {
+            Picker("Model", selection: Binding(get: { settings.cloudModel(for: provider) },
+                                               set: { settings.setCloudModel($0, for: provider) })) {
+                ForEach(provider.models, id: \.id) { Text($0.title).tag($0.id) }
+            }
+            .id(keyChanged)
         }
     }
 
     private var mixtureCaption: String {
         guard settings.mixtureOfExperts else { return "Off: one service transcribes. On: every service with a key transcribes, then OpenAI merges the results." }
         return CloudProviderID.openAI.apiKey == nil
-            ? "Every service below with a key transcribes. Add an OpenAI key to merge the results; until then the best single transcript is used."
-            : "Every service below with a key transcribes, then OpenAI \(OpenAIChat.mergeModel) merges the transcripts (not the audio)."
+            ? "Every service below with a key transcribes. Add an OpenAI key to merge the results; until then the best one is used."
+            : "Every service below with a key transcribes, then OpenAI merges the results into one."
     }
 }
 
@@ -222,7 +225,8 @@ struct ProviderKeyRow: View {
             }
             if editing || (!hasKey && found == nil) {
                 HStack {
-                    SecureField("Paste your \(provider.title) API key", text: $key)
+                    SecureField("", text: $key, prompt: Text("Paste your \(provider.title) API key"))
+                        .labelsHidden()
                         .textFieldStyle(.roundedBorder)
                     Button("Save") { save(key) }
                         .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
