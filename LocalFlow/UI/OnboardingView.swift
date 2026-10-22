@@ -220,7 +220,7 @@ struct OnboardingView: View {
                     Text(MixtureOfExperts.title).font(.headline)
                     Text(MixtureOfExperts.explanation)
                 }
-                Text("You can set this up later in Settings → Cloud.")
+                Text("You can set this up later in Settings → Transcription.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             .font(.callout)
