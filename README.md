@@ -29,7 +29,7 @@ You speak faster than you type. Local Flow keeps all voice dictation private. No
 - **One dictionary.** A plain list of names, products and jargon. Sent to the model as a hint and used to fix spelling on-device. Setup lets you add word packs for your field (engineering, product, sales, legal…).
 - **Cleanup that never leaves your Mac.** Ums and uhs, capitalization, punctuation and "new paragraph" are handled with rules, not a model. It also knows where you are typing: terminals, code editors and browser address bars get lowercase with no sentence punctuation (`git status`, `example.com`); chat apps skip the final period. On by default, one toggle to turn off.
 - **Short-lived history.** Transcripts stay on your Mac only while the app is running — wiped when you quit (and on launch), and never kept longer than 12 hours. The voice recording behind each one is deleted after 5 minutes (long enough for a Retry) and can't be played back in the app.
-- **Self-updating.** Checks GitHub Releases once a day and installs the new DMG in place.
+- **Self-updating.** Checks GitHub Releases once a day (also while it stays open) and installs the new DMG in place.
 
 ## Install
 

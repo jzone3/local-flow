@@ -63,10 +63,21 @@ final class UpdateChecker: NSObject, ObservableObject, URLSessionDownloadDelegat
     private var progressWindow: UpdateProgressWindow?
     private var pendingRelease: Release?
 
+    private var dailyTimer: Timer?
+
+    /// Checks at launch if a day has passed, then keeps checking once a day while the app stays open
+    /// (it starts at login and rarely quits). The hourly tick catches up after the Mac sleeps.
     func checkOnLaunch() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.checkIfDue() }
+        dailyTimer?.invalidate()
+        dailyTimer = Timer.scheduledTimer(withTimeInterval: 60 * 60, repeats: true) { [weak self] _ in self?.checkIfDue() }
+        dailyTimer?.tolerance = 5 * 60
+    }
+
+    private func checkIfDue() {
         if let last = UserDefaults.standard.object(forKey: Self.lastCheckKey) as? Date,
            Date().timeIntervalSince(last) < Self.checkInterval { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.check(userInitiated: false) }
+        check(userInitiated: false)
     }
 
     func check(userInitiated: Bool) {
