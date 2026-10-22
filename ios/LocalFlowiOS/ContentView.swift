@@ -89,9 +89,7 @@ private struct StatusArea: View {
 struct ListeningBar: View {
     @EnvironmentObject var dictation: DictationModel
     @ObservedObject var recorder: Recorder
-    // GestureState resets even when the system cancels the touch (onEnded never fires then), so a hold always stops.
-    @GestureState private var pressing = false
-    @State private var pressStarted = false
+    @State private var pressing = false
 
     // The Mac bar's sizes (24 pt row, 16/8 padding, 170 pt waveform) scaled up for a thumb.
     static let rowHeight: CGFloat = 32
@@ -110,17 +108,16 @@ struct ListeningBar: View {
             .animation(.easeOut(duration: 0.12), value: pressing)
             .animation(.spring(duration: 0.3), value: dictation.phase)
             .contentShape(Capsule())
-            .gesture(DragGesture(minimumDistance: 0).updating($pressing) { _, state, _ in state = true })
-            .onChange(of: pressing) { _, down in
+            .overlay(PressArea { down in
                 if down {
-                    guard dictation.phase != .transcribing else { return }
-                    pressStarted = true
+                    guard !pressing, dictation.phase != .transcribing else { return }
+                    pressing = true
                     dictation.pressBegan()
-                } else if pressStarted {
-                    pressStarted = false
+                } else if pressing {
+                    pressing = false
                     dictation.pressEnded()
                 }
-            }
+            })
             .accessibilityElement()
             .accessibilityLabel(dictation.isListening ? "Stop" : "Start dictation")
             .accessibilityAddTraits(.isButton)
@@ -151,6 +148,23 @@ struct ListeningBar: View {
                 Text("Tap or hold to talk").font(.system(size: 15, weight: .medium))
             }
         }
+    }
+}
+
+/// Raw touch down/up from UIKit. A SwiftUI drag gesture here lost its release once listening started, so
+/// hold-to-talk kept listening after the finger came up.
+private struct PressArea: UIViewRepresentable {
+    var onChange: (Bool) -> Void
+
+    func makeUIView(context: Context) -> TouchView { TouchView() }
+    func updateUIView(_ view: TouchView, context: Context) { view.onChange = onChange }
+
+    final class TouchView: UIView {
+        var onChange: (Bool) -> Void = { _ in }
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { onChange(true) }
+        override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) { onChange(false) }
+        override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { onChange(false) }
     }
 }
 
