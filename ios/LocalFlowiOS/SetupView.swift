@@ -37,7 +37,7 @@ struct SetupView: View {
                 Button {
                     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                 } label: {
-                    Text("Open Settings").frame(maxWidth: .infinity)
+                    Text("Open Settings").frame(maxWidth: .infinity).foregroundStyle(Color(.systemBackground))
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)

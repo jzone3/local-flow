@@ -89,7 +89,9 @@ private struct StatusArea: View {
 struct ListeningBar: View {
     @EnvironmentObject var dictation: DictationModel
     @ObservedObject var recorder: Recorder
-    @State private var pressing = false
+    // GestureState resets even when the system cancels the touch (onEnded never fires then), so a hold always stops.
+    @GestureState private var pressing = false
+    @State private var pressStarted = false
 
     // The Mac bar's sizes (24 pt row, 16/8 padding, 170 pt waveform) scaled up for a thumb.
     static let rowHeight: CGFloat = 32
@@ -108,19 +110,17 @@ struct ListeningBar: View {
             .animation(.easeOut(duration: 0.12), value: pressing)
             .animation(.spring(duration: 0.3), value: dictation.phase)
             .contentShape(Capsule())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        guard !pressing, dictation.phase != .transcribing else { return }
-                        pressing = true
-                        dictation.pressBegan()
-                    }
-                    .onEnded { _ in
-                        guard pressing else { return }
-                        pressing = false
-                        dictation.pressEnded()
-                    }
-            )
+            .gesture(DragGesture(minimumDistance: 0).updating($pressing) { _, state, _ in state = true })
+            .onChange(of: pressing) { _, down in
+                if down {
+                    guard dictation.phase != .transcribing else { return }
+                    pressStarted = true
+                    dictation.pressBegan()
+                } else if pressStarted {
+                    pressStarted = false
+                    dictation.pressEnded()
+                }
+            }
             .accessibilityElement()
             .accessibilityLabel(dictation.isListening ? "Stop" : "Start dictation")
             .accessibilityAddTraits(.isButton)

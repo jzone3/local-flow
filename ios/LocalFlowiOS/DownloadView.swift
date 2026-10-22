@@ -47,7 +47,7 @@ struct DownloadView: View {
                     Button { models.cancel() } label: { Text("Cancel").frame(maxWidth: .infinity) }
                         .buttonStyle(.bordered)
                 } else {
-                    Button { models.download() } label: { Text("Download").frame(maxWidth: .infinity) }
+                    Button { models.download() } label: { Text("Download").frame(maxWidth: .infinity).foregroundStyle(Color(.systemBackground)) }
                         .buttonStyle(.borderedProminent)
                 }
             }
