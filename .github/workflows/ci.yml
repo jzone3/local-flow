@@ -25,3 +25,8 @@ jobs:
           -configuration Debug -derivedDataPath build
           CODE_SIGNING_ALLOWED=NO build | tail -20
       - run: scripts/test-core.sh
+      - run: cd ios && xcodegen generate
+      - run: >
+          xcodebuild -project ios/LocalFlowiOS.xcodeproj -scheme LocalFlowiOS
+          -configuration Debug -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath build-ios CODE_SIGNING_ALLOWED=NO build | tail -20
