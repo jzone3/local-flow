@@ -19,8 +19,6 @@ struct SetupView: View {
                     Button("Open Settings") {
                         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                     }
-                } footer: {
-                    Text("Shortcut: Settings → Local Flow → Keyboards has both switches.")
                 }
                 Section("Using it") {
                     Text("Tap Dictate on the keyboard. Local Flow opens and listens. Tap stop, then tap ◀ in the top-left to go back and tap Insert.")

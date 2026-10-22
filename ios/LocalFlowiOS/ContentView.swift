@@ -34,6 +34,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showSetup) { SetupView() }
             .sheet(isPresented: $showDictionary) { DictionaryView() }
+            .onChange(of: dictation.isListening) { _, listening in
+                if listening { showSetup = false; showDictionary = false }
+            }
         }
     }
 

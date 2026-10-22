@@ -40,5 +40,6 @@ struct RootView: View {
         }
         .onAppear { if models.isDownloaded { WhisperEngine.shared.preload() } }
         .sheet(isPresented: $showSetup) { SetupView() }
+        .onChange(of: dictation.isListening) { _, listening in if listening { showSetup = false } }
     }
 }
