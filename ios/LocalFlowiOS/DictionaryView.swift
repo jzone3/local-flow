@@ -24,6 +24,8 @@ struct DictionaryView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .windowBackground()
             .navigationTitle("Dictionary")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }

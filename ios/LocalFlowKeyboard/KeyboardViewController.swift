@@ -11,24 +11,27 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        // The Mac app's listening bar: a black pill with the white mic glyph.
         var dictate = UIButton.Configuration.filled()
         dictate.title = "Dictate"
-        dictate.image = UIImage(systemName: "mic.fill")
-        dictate.imagePadding = 8
-        dictate.baseBackgroundColor = .label
-        dictate.baseForegroundColor = .systemBackground
-        dictate.cornerStyle = .large
-        dictate.buttonSize = .large
+        dictate.image = Self.glyph("mic", size: 18)
+        dictate.imagePadding = 10
+        dictate.baseBackgroundColor = .black
+        dictate.baseForegroundColor = .white
+        dictate.cornerStyle = .capsule
+        dictate.background.strokeColor = UIColor.white.withAlphaComponent(0.18)
+        dictate.background.strokeWidth = 1
+        dictate.titleTextAttributesTransformer = Self.font(.systemFont(ofSize: 17, weight: .medium))
         dictateButton.configuration = dictate
         dictateButton.addTarget(self, action: #selector(dictateTapped), for: .touchUpInside)
 
         var insert = UIButton.Configuration.gray()
         insert.title = "Insert"
-        insert.image = UIImage(systemName: "text.insert")
-        insert.imagePadding = 8
+        insert.image = Self.glyph("text-lines", size: 18)
+        insert.imagePadding = 10
+        insert.titleTextAttributesTransformer = Self.font(.systemFont(ofSize: 17, weight: .medium))
         insert.baseForegroundColor = .label
         insert.cornerStyle = .large
-        insert.buttonSize = .large
         insert.titleLineBreakMode = .byTruncatingTail
         insert.subtitleLineBreakMode = .byTruncatingTail
         insertButton.configuration = insert
@@ -120,6 +123,23 @@ final class KeyboardViewController: UIInputViewController {
                 return
             }
             responder = current.next
+        }
+    }
+
+    /// The Mac app's glyphs (its Icons asset catalog), sized for a button.
+    private static func glyph(_ name: String, size: CGFloat) -> UIImage? {
+        guard let image = UIImage(named: name, in: Bundle(for: KeyboardViewController.self), with: nil) else { return nil }
+        let format = UIGraphicsImageRendererFormat.preferred()
+        return UIGraphicsImageRenderer(size: CGSize(width: size, height: size), format: format).image { _ in
+            image.draw(in: CGRect(x: 0, y: 0, width: size, height: size))
+        }.withRenderingMode(.alwaysTemplate)
+    }
+
+    private static func font(_ font: UIFont) -> UIConfigurationTextAttributesTransformer {
+        UIConfigurationTextAttributesTransformer { attributes in
+            var attributes = attributes
+            attributes.font = font
+            return attributes
         }
     }
 

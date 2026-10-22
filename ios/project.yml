@@ -37,6 +37,9 @@ targets:
         group: Shared/FromMac
       - path: ../LocalFlow/Transcription/WhisperDecode.swift
         group: Shared/FromMac
+      # The Mac app's glyphs (Icons/), so both apps draw the same icons. Its mac AppIcon set is unused here.
+      - path: ../LocalFlow/Resources/Assets.xcassets
+        group: Shared/FromMac
     dependencies:
       # whisper.cpp prebuilt xcframework (has iOS device + simulator slices), fetched by scripts/fetch-whisper.sh.
       - framework: ../Vendor/whisper.xcframework
@@ -65,7 +68,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jzone3.LocalFlow.iOS
         PRODUCT_NAME: Local Flow
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_APPICON_NAME: iPhoneAppIcon
         OTHER_LDFLAGS: "$(inherited) -lc++"
   LocalFlowKeyboard:
     type: app-extension
@@ -78,6 +81,8 @@ targets:
       - path: ../LocalFlow/Core/TextCleanup.swift
         group: Shared/FromMac
       - path: ../LocalFlow/Core/CleanupProfile.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Resources/Assets.xcassets
         group: Shared/FromMac
     entitlements:
       path: LocalFlowKeyboard/LocalFlowKeyboard.entitlements
