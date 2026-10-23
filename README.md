@@ -49,6 +49,20 @@ open "build/Build/Products/Debug/Local Flow.app"
 
 Tests for the pure-Swift core (cleanup rules, dictionary spelling fixes, env-key scan, version compare) run with `scripts/test-core.sh`.
 
+## iPhone (preview)
+
+A first try at Local Flow on iPhone: an app with one big record button, and a keyboard that opens it. Tap to start and tap to stop, or hold to talk and let go. The text is made on the phone (whisper.cpp, Classic model, a one-time 574 MB download in the app) and copied to the clipboard. Tap ◀ in the top-left to go back, then tap Insert on the keyboard or paste.
+
+```sh
+brew install xcodegen
+scripts/fetch-whisper.sh
+cd ios && xcodegen generate && open LocalFlowiOS.xcodeproj
+```
+
+Run the LocalFlowiOS scheme on a Simulator or your iPhone. For a real iPhone, pick your team under Signing & Capabilities for both targets (LocalFlowiOS and LocalFlowKeyboard); `DEVELOPMENT_TEAM` is left empty in `ios/project.yml` on purpose. If Xcode says the App Group is taken, change `group.com.jzone3.LocalFlow` in `ios/project.yml` and `ios/Shared/SharedStore.swift`.
+
+Turn on the keyboard: Settings → General → Keyboard → Keyboards → Add New Keyboard → Local Flow, then tap Local Flow and turn on Allow Full Access (the keyboard needs it to read the last transcript). iOS has no way for an app to send you back, so the system ◀ breadcrumb is how you return.
+
 ## Layout
 
 ```
