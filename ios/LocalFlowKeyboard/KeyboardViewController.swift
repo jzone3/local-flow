@@ -90,14 +90,14 @@ final class KeyboardViewController: UIInputViewController {
         if !hasFullAccess {
             note.text = "Turn on Allow Full Access in Settings → Local Flow → Keyboards to use Insert."
         } else if last == nil {
-            note.text = "Tap Dictate, speak, then come back with ◀ and tap Insert."
+            note.text = "Tap Dictate and speak. You come back here; tap Insert."
         } else {
             note.text = nil
         }
         note.isHidden = note.text == nil
     }
 
-    @objc private func dictateTapped() { openApp(SharedStore.dictateURL) }
+    @objc private func dictateTapped() { openApp(SharedStore.dictateURL(returningTo: HostApp.bundleID(of: self))) }
 
     @objc private func insertTapped() {
         refresh()
