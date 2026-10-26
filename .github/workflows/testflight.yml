@@ -44,6 +44,9 @@ jobs:
           NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
         run: echo "$NOTARY_KEY_P8" | base64 --decode > "$ASC_KEY_PATH"
 
+      # Archive with an ad-hoc signature (keeps the App Group entitlements, needs no certificate);
+      # the export step re-signs with a cloud-managed distribution certificate, so CI never creates
+      # a development certificate (the account is at its limit for those).
       - name: Archive
         run: |
           xcodebuild archive \
@@ -53,16 +56,15 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath "$ARCHIVE" \
             -derivedDataPath build-ios \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            PROVISIONING_PROFILE_SPECIFIER= \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
             | tail -40
 
-      - name: Upload to TestFlight
+      - name: Export (App Store signing)
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
@@ -70,7 +72,7 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>upload</string>
+            <key>destination</key><string>export</string>
             <key>teamID</key><string>$APPLE_TEAM_ID</string>
             <key>signingStyle</key><string>automatic</string>
             <key>manageAppVersionAndBuildNumber</key><false/>
@@ -86,3 +88,21 @@ jobs:
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             | tail -40
+
+      - name: Check entitlements
+        run: |
+          cd "$RUNNER_TEMP/export"
+          unzip -q -o ./*.ipa -d ipa
+          APP="ipa/Payload/Local Flow.app"
+          for BUNDLE in "$APP" "$APP/PlugIns/LocalFlowKeyboard.appex"; do
+            echo "== $BUNDLE"
+            codesign -d --entitlements - --xml "$BUNDLE" | plutil -p -
+            codesign -d --entitlements - --xml "$BUNDLE" | grep -q group.com.jzone3.LocalFlow
+          done
+
+      - name: Upload to TestFlight
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          cp "$ASC_KEY_PATH" ~/.appstoreconnect/private_keys/AuthKey_"$ASC_KEY_ID".p8
+          xcrun altool --upload-app -t ios -f "$RUNNER_TEMP"/export/*.ipa \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
