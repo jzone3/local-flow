@@ -1,0 +1,126 @@
+name: TestFlight
+
+# Builds the iPhone app + keyboard (ios/), signs it for the App Store and uploads it to TestFlight.
+# Push any `testflight/**` branch to upload that commit. Needs an App Store Connect team key with the
+# Admin role (secrets ASC_KEY_ID + ASC_KEY_P8, base64 of the .p8); the issuer ID is the team's, shared
+# with the notary key. scripts/asc-signing.py creates the App IDs, a temporary distribution certificate
+# and App Store profiles through the API (Xcode's cloud signing can't read App Groups with an API key),
+# and removes the certificate and profiles at the end. The App Group must be ticked on both App IDs
+# once in developer.apple.com, since the API can't do that.
+on:
+  push:
+    branches: ["testflight/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  upload:
+    runs-on: macos-26
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Paths
+        run: |
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          echo "ARCHIVE=$RUNNER_TEMP/LocalFlowiOS.xcarchive" >> "$GITHUB_ENV"
+
+      - run: brew install xcodegen
+      - run: scripts/fetch-whisper.sh
+      - run: cd ios && xcodegen generate
+
+      - name: API key
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          echo "$ASC_KEY_P8" | base64 --decode > "$ASC_KEY_PATH"
+          head -1 "$ASC_KEY_PATH" | grep -q "BEGIN PRIVATE KEY" || { echo "ASC_KEY_P8 does not decode to a .p8 key"; exit 1; }
+          pip3 install -q --break-system-packages pyjwt cryptography
+
+      - name: Signing assets
+        run: python3 scripts/asc-signing.py setup
+
+      - name: Keychain and profiles
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p "" "$KC"
+          security set-keychain-settings "$KC"
+          security unlock-keychain -p "" "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          curl -fsSL -o "$RUNNER_TEMP/wwdr.cer" https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer
+          security import "$RUNNER_TEMP/wwdr.cer" -k "$KC" -T /usr/bin/codesign
+          security import "$RUNNER_TEMP/dist.p12" -k "$KC" -P localflow -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$KC" > /dev/null
+          security find-identity -v -p codesigning "$KC"
+          for DIR in ~/Library/MobileDevice/Provisioning\ Profiles ~/Library/Developer/Xcode/UserData/Provisioning\ Profiles; do
+            mkdir -p "$DIR" && cp "$RUNNER_TEMP"/*.mobileprovision "$DIR"/
+          done
+
+      # Archive with an ad-hoc signature (keeps the entitlements, needs no certificate); the export
+      # step re-signs it with the distribution certificate and App Store profiles.
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project ios/LocalFlowiOS.xcodeproj \
+            -scheme LocalFlowiOS \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE" \
+            -derivedDataPath build-ios \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            PROVISIONING_PROFILE_SPECIFIER= \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            | tail -40
+
+      - name: Export (App Store signing)
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            | tail -40
+
+      - name: Check entitlements
+        run: |
+          cd "$RUNNER_TEMP/export"
+          unzip -q -o ./*.ipa -d ipa
+          APP="ipa/Payload/Local Flow.app"
+          for BUNDLE in "$APP" "$APP/PlugIns/LocalFlowKeyboard.appex"; do
+            echo "== $BUNDLE"
+            codesign -d --entitlements - --xml "$BUNDLE" | plutil -p -
+            codesign -d --entitlements - --xml "$BUNDLE" | grep -q group.com.jzone3.LocalFlow
+          done
+
+      - name: Upload to TestFlight
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          cp "$ASC_KEY_PATH" ~/.appstoreconnect/private_keys/AuthKey_"$ASC_KEY_ID".p8
+          xcrun altool --upload-app -t ios -f "$RUNNER_TEMP"/export/*.ipa \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Public TestFlight link
+        env:
+          ASC_CONTACT_PHONE: ${{ secrets.ASC_CONTACT_PHONE }}
+        run: python3 scripts/asc-beta.py
+
+      - name: Remove temporary certificate
+        if: always()
+        run: |
+          [ -f "$ASC_KEY_PATH" ] && python3 scripts/asc-signing.py cleanup || true
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true

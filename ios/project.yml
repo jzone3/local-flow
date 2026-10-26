@@ -1,0 +1,111 @@
+# iPhone app + keyboard (preview). Generate with `xcodegen generate` inside ios/.
+# Shares Core and the whisper decode with the Mac app by path; uses the same Vendor/whisper.xcframework.
+name: LocalFlowiOS
+options:
+  bundleIdPrefix: com.jzone3
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  xcodeVersion: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    # Set your team in Xcode (Signing & Capabilities) to run on an iPhone; the simulator needs none.
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_STRICT_CONCURRENCY: minimal
+targets:
+  LocalFlowiOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: LocalFlowiOS
+      - path: Shared
+      - path: ../LocalFlow/Core/Vocabulary.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Core/VocabularyPacks.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Core/TextCleanup.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Core/CleanupProfile.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Core/AutoGain.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Transcription/WhisperDecode.swift
+        group: Shared/FromMac
+      # The Mac app's glyphs (Icons/), so both apps draw the same icons. Its mac AppIcon set is unused here.
+      - path: ../LocalFlow/Resources/Assets.xcassets
+        group: Shared/FromMac
+    dependencies:
+      # whisper.cpp prebuilt xcframework (has iOS device + simulator slices), fetched by scripts/fetch-whisper.sh.
+      - framework: ../Vendor/whisper.xcframework
+        embed: true
+        codeSign: true
+      - target: LocalFlowKeyboard
+    entitlements:
+      path: LocalFlowiOS/LocalFlowiOS.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.jzone3.LocalFlow
+    info:
+      path: LocalFlowiOS/Info.plist
+      properties:
+        CFBundleDisplayName: Local Flow
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleURLTypes:
+          - CFBundleURLName: com.jzone3.LocalFlow.iOS
+            CFBundleURLSchemes: [localflow]
+        NSMicrophoneUsageDescription: Local Flow listens only while the button is on. Your voice is turned into text on this iPhone and never sent anywhere.
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jzone3.LocalFlow.iOS
+        PRODUCT_NAME: Local Flow
+        ASSETCATALOG_COMPILER_APPICON_NAME: iPhoneAppIcon
+        OTHER_LDFLAGS: "$(inherited) -lc++"
+  LocalFlowKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LocalFlowKeyboard
+      - path: Shared
+      - path: ../LocalFlow/Core/Vocabulary.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Core/TextCleanup.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Core/CleanupProfile.swift
+        group: Shared/FromMac
+      - path: ../LocalFlow/Resources/Assets.xcassets
+        group: Shared/FromMac
+    entitlements:
+      path: LocalFlowKeyboard/LocalFlowKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.jzone3.LocalFlow
+    info:
+      path: LocalFlowKeyboard/Info.plist
+      properties:
+        CFBundleDisplayName: Local Flow
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: en-US
+            # Full Access is what lets the keyboard read the last transcript from the app's shared group.
+            RequestsOpenAccess: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jzone3.LocalFlow.iOS.Keyboard
+        PRODUCT_NAME: LocalFlowKeyboard
