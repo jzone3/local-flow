@@ -63,6 +63,7 @@ targets:
         NSMicrophoneUsageDescription: Local Flow listens only while the button is on. Your voice is turned into text on this iPhone and never sent anywhere.
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:

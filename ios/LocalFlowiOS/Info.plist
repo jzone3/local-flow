@@ -37,6 +37,8 @@
 	<string>Local Flow listens only while the button is on. Your voice is turned into text on this iPhone and never sent anywhere.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>UIRequiresFullScreen</key>
+	<true/>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
