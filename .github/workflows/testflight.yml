@@ -48,6 +48,27 @@ jobs:
       # Archive with an ad-hoc signature (keeps the App Group entitlements, needs no certificate);
       # the export step re-signs with a cloud-managed distribution certificate, so CI never creates
       # a development certificate (the account is at its limit for those).
+      - name: Check API key
+        run: |
+          head -1 "$ASC_KEY_PATH" | grep -q "BEGIN PRIVATE KEY" || { echo "ASC_KEY_P8 does not decode to a .p8 key"; exit 1; }
+          echo "Key ID length: ${#ASC_KEY_ID}"
+          pip3 install -q --break-system-packages pyjwt cryptography 2>/dev/null || pip3 install -q pyjwt cryptography
+          python3 - <<'PY'
+          import jwt, os, time, urllib.request, urllib.error
+          key = open(os.environ["ASC_KEY_PATH"]).read()
+          tok = jwt.encode({"iss": os.environ["ASC_ISSUER_ID"], "iat": int(time.time()), "exp": int(time.time()) + 600, "aud": "appstoreconnect-v1"},
+                           key, algorithm="ES256", headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"})
+          req = urllib.request.Request("https://api.appstoreconnect.apple.com/v1/bundleIds?limit=50", headers={"Authorization": "Bearer " + tok})
+          try:
+              body = urllib.request.urlopen(req).read().decode()
+              import json
+              ids = [d["attributes"]["identifier"] for d in json.loads(body)["data"]]
+              print("API key works. Bundle IDs:", ids)
+          except urllib.error.HTTPError as e:
+              print("API key rejected:", e.code, e.read().decode()[:400])
+              raise SystemExit(1)
+          PY
+
       - name: Archive
         run: |
           xcodebuild archive \
