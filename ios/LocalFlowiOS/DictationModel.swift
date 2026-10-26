@@ -18,8 +18,6 @@ final class DictationModel: ObservableObject {
     private var pendingSamples: [Float]?
     private var pressStartedAt: Date?
     private var stopOnRelease = false
-    /// The app the keyboard was typing in; we go back to it once the text is copied.
-    private var returnBundleID: String?
 
     var isListening: Bool { phase == .listening }
 
@@ -55,8 +53,6 @@ final class DictationModel: ObservableObject {
     func handle(_ url: URL, modelReady: Bool) {
         guard url.scheme == "localflow", url.host == "dictate" else { return }
         cameFromKeyboard = true
-        returnBundleID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?.first { $0.name == SharedStore.returnQueryItem }?.value
         pendingStart = true
         if modelReady { startIfRequested() }
     }
@@ -127,22 +123,9 @@ final class DictationModel: ObservableObject {
                 SharedStore.lastTranscript = text
                 phase = .done
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                goBack()
             } catch {
                 phase = .failed(error.localizedDescription)
             }
-        }
-    }
-
-    /// Shows "Copied" for a moment, then reopens the app the keyboard came from. If that fails, the ◀ hint stays.
-    private func goBack() {
-        guard let bundleID = returnBundleID else { return }
-        returnBundleID = nil
-        Task {
-            try? await Task.sleep(for: .milliseconds(700))
-            guard phase == .done else { return }
-            let ok = ReturnToHost.open(bundleID)
-            DebugLog.write("return to \(bundleID): \(ok)")
         }
     }
 }

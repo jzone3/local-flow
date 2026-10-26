@@ -23,7 +23,7 @@ struct SetupView: View {
                     VStack(spacing: 0) {
                         SetupRow(icon: "mic", "Dictate", "Tap Dictate on the keyboard. Local Flow opens and listens.")
                         RowDivider()
-                        SetupRow(icon: "check-circle", "Go back", "Tap the bar to stop. You go back on your own. Tap Insert.")
+                        SetupRow(icon: "check-circle", "Go back", "Tap the bar to stop, then ◀ in the top-left. Tap Insert.")
                         RowDivider()
                         SetupRow(icon: "lock", "Nothing is sent", "Full Access only lets the keyboard read your last transcript from this app.")
                     }

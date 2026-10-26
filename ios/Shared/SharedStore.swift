@@ -5,13 +5,6 @@ enum SharedStore {
     static let appGroup = "group.com.jzone3.LocalFlow"
     /// Opening this starts listening right away.
     static let dictateURL = URL(string: "localflow://dictate")!
-    static let returnQueryItem = "return"
-
-    static func dictateURL(returningTo bundleID: String?) -> URL {
-        guard let bundleID, var components = URLComponents(url: dictateURL, resolvingAgainstBaseURL: false) else { return dictateURL }
-        components.queryItems = [URLQueryItem(name: returnQueryItem, value: bundleID)]
-        return components.url ?? dictateURL
-    }
 
     private static var defaults: UserDefaults? { UserDefaults(suiteName: appGroup) }
 
