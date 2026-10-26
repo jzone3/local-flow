@@ -104,6 +104,10 @@ final class DictationModel: ObservableObject {
     }
 
     private func transcribe(_ samples: [Float]) {
+        guard SpeechGate.hasSpeech(samples) else {
+            phase = .failed("Didn't catch anything.")
+            return
+        }
         phase = .transcribing
         let vocabulary = Vocabulary(text: UserDefaults.standard.string(forKey: "vocabulary") ?? Vocabulary.defaultText)
         let sampler = MemorySampler()

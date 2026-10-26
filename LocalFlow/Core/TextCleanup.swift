@@ -76,7 +76,7 @@ enum TextCleanup {
         "thanks for watching", "thank you for watching", "thanks for listening", "thank you for listening",
         "please subscribe", "like and subscribe", "don't forget to subscribe", "see you in the next video",
         "see you next time", "subtitles by the amara org community", "subtitles by amara org", "transcribed by",
-        "the end", "you", "bye", "music", "silence", "blank audio", "inaudible", "foreign",
+        "the end", "you", "bye", "music", "silence", "blank audio", "inaudible", "foreign", "let s get started",
     ]
 
     static func isHallucination(_ text: String) -> Bool {

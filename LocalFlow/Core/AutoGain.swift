@@ -24,3 +24,21 @@ struct AutoGain {
 
     mutating func reset() { self = AutoGain() }
 }
+
+/// Whisper invents a sentence ("Let's get started.") for a clip with no speech in it, so a clip whose loudest
+/// tenth of a second stays below `threshold` dBFS is treated as nothing said and never reaches the model.
+enum SpeechGate {
+    static let threshold: Float = -50
+
+    static func hasSpeech(_ samples: [Float], sampleRate: Int = 16_000) -> Bool {
+        let window = max(1, sampleRate / 10)
+        var start = 0
+        while start < samples.count {
+            let chunk = samples[start..<min(samples.count, start + window)]
+            let rms = sqrt(chunk.reduce(0) { $0 + $1 * $1 } / Float(chunk.count))
+            if 20 * log10(max(rms, 1e-6)) >= threshold { return true }
+            start += window
+        }
+        return false
+    }
+}
