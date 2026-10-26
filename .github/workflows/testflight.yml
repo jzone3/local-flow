@@ -1,9 +1,10 @@
 name: TestFlight
 
 # Builds the iPhone app + keyboard (ios/), signs it for the App Store and uploads it to TestFlight.
-# Push any `testflight/**` branch to upload that commit. Uses the App Store Connect API key the Mac
-# release notarizes with; it needs the Admin role so Xcode can create the distribution certificate,
-# the App IDs and the App Group on its own.
+# Push any `testflight/**` branch to upload that commit. Needs an App Store Connect team key with the
+# Admin role (secrets ASC_KEY_ID + ASC_KEY_P8, base64 of the .p8) so Xcode can use a cloud-managed
+# distribution certificate and create the App IDs, App Group and profiles on its own. The issuer ID is
+# the team's, shared with the notary key.
 on:
   push:
     branches: ["testflight/**"]
@@ -25,7 +26,7 @@ jobs:
     runs-on: macos-26
     env:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      ASC_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
     steps:
       - uses: actions/checkout@v4
@@ -41,8 +42,8 @@ jobs:
 
       - name: API key
         env:
-          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
-        run: echo "$NOTARY_KEY_P8" | base64 --decode > "$ASC_KEY_PATH"
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: echo "$ASC_KEY_P8" | base64 --decode > "$ASC_KEY_PATH"
 
       # Archive with an ad-hoc signature (keeps the App Group entitlements, needs no certificate);
       # the export step re-signs with a cloud-managed distribution certificate, so CI never creates
