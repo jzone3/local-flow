@@ -93,8 +93,20 @@ struct Vocabulary: Equatable {
                 .joined(separator: "|")
             out = replaceWholeWords(in: out, pattern: "(?:\(pattern))", with: term)
         }
+        let known = Set(terms.map { $0.lowercased() })
+        for term in terms {
+            for heard in Self.soundAlikes[term] ?? [] where !known.contains(heard.lowercased()) {
+                out = replaceWholeWords(in: out, pattern: NSRegularExpression.escapedPattern(for: heard), with: term)
+            }
+        }
         return out
     }
+
+    /// Real words Whisper writes instead of a dictionary term that sounds the same, even with the term in its
+    /// prompt. Used only while the term is in the dictionary and the sound-alike itself isn't.
+    static let soundAlikes: [String: [String]] = [
+        "Devin": ["Devon", "Devan", "Deven"],
+    ]
 
     private func needsCorrection(_ term: String) -> Bool {
         let letters = term.filter { $0.isLetter }
