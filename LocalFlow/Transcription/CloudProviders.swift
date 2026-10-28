@@ -92,7 +92,7 @@ struct OpenAITranscriber: TranscriptionProvider {
         req.httpBody = form.finish()
         let (data, _) = try await HTTP.send(req)
         guard let text = try HTTP.json(data)["text"] as? String else { throw TranscriptionError.badResponse("missing text") }
-        return TranscriptionResult(text: text, engine: name)
+        return TranscriptionResult(text: !hint.isEmpty && Vocabulary.isPromptEcho(text) ? "" : text, engine: name)
     }
 }
 
@@ -139,7 +139,7 @@ struct GeminiTranscriber: TranscriptionProvider {
             "generationConfig": ["temperature": 0],
         ]
         let text = try await Gemini.generate(body: body, model: model, key: key)
-        return TranscriptionResult(text: text, engine: name)
+        return TranscriptionResult(text: !hint.isEmpty && Vocabulary.isPromptEcho(text) ? "" : text, engine: name)
     }
 }
 
