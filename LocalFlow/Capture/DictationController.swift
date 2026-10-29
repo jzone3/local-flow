@@ -343,6 +343,17 @@ final class DictationController: ObservableObject {
         if let entry = lastEntry { retry(entry) }
     }
 
+    /// Newest text that came out of a dictation or file, for when the paste got lost.
+    var lastTranscription: String? {
+        HistoryStore.shared.entries.filter { !$0.text.isEmpty }.max { $0.date < $1.date }?.text
+    }
+
+    func copyLastTranscription() {
+        guard let text = lastTranscription else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
     /// The app the text will land in is the one in front: Local Flow is an accessory app and never takes that spot.
     private static func targetProfile() -> CleanupProfile {
         let focused = HotkeyMonitor.hasAccessibility ? TextInserter.focusedElement() : nil
