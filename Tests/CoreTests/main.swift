@@ -106,7 +106,11 @@ expect(vocab.promptHint(limit: 3), "Okay, so here are some names and terms I use
 expect(Vocabulary.isPromptEcho(" Okay, so here are some names and terms I use a lot."), "prompt echo: opener")
 expect(Vocabulary.isPromptEcho(vocab.promptHint(limit: 3)), "prompt echo: whole hint")
 expect(!Vocabulary.isPromptEcho(" Here are some names for the team: GitHub and ChatGPT."), "prompt echo: real speech kept")
-expect(!Vocabulary.isPromptEcho(" Let's get started."), "prompt echo: short overlap kept")
+expect(Vocabulary.isPromptEcho(" Let's get started."), "prompt echo: closer alone")
+expect(Vocabulary.isPromptEcho("LET'S GET STARTED"), "prompt echo: closer case-insensitive")
+expect(!Vocabulary.isPromptEcho(" Okay, let's get started on the report."), "prompt echo: closer inside real speech kept")
+expect(!Vocabulary.echoesPromptOpener(" Let's get started."), "segment filter keeps a lone closer segment")
+expect(Vocabulary.echoesPromptOpener(" Okay, so here are some names and terms I use a lot."), "segment filter drops opener")
 expect(Vocabulary(text: vocab.text) == vocab, "round trip")
 expect(!Vocabulary(text: Vocabulary.defaultText).terms.isEmpty, "default list parses")
 
