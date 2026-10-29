@@ -17,6 +17,8 @@ struct LocalFlowApp: App {
             Button("History…") { WindowManager.shared.showHistory() }
             Button("Last Transcript…") { WindowManager.shared.showLastTranscript() }
                 .disabled(history.entries.isEmpty || controller.lastEntry?.failed == true)
+            Button("Copy Last Transcription") { controller.copyLastTranscription() }
+                .disabled(controller.lastTranscription == nil)
             Button("Retry Last Dictation") { controller.retryLast() }
                 .disabled(controller.lastEntry?.audioFileName == nil || controller.state.isActive)
             Button("Transcribe File…") { FilePicker.chooseAndTranscribe() }
