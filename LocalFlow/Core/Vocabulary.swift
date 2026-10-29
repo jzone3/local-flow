@@ -62,18 +62,12 @@ struct Vocabulary: Equatable {
     static let promptCloser = "Let's get started."
 
     /// True when a piece of transcript is the hint read back rather than speech: on a quiet window Whisper
-    /// sometimes echoes its prompt instead of staying silent.
-    /// Pass the whole transcript: the closer alone is only an echo when nothing else was said.
+    /// sometimes echoes its prompt instead of staying silent. The opener is long enough that real speech never
+    /// contains it, so this is safe per segment. Silent short presses are dropped before the model (`SpeechGate`).
     static func isPromptEcho(_ text: String) -> Bool {
-        echoesPromptOpener(text) || letters(text) == letters(promptCloser)
+        let letters = { (s: String) in s.lowercased().filter(\.isLetter) }
+        return letters(text).contains(letters(promptOpener))
     }
-
-    /// Safe per segment: the opener is long enough that real speech never contains it.
-    static func echoesPromptOpener(_ text: String) -> Bool {
-        letters(text).contains(letters(promptOpener))
-    }
-
-    private static func letters(_ text: String) -> String { text.lowercased().filter(\.isLetter) }
 
     /// Terms safe for keyword/keyterm API fields (ElevenLabs: ≤5 words, <50 chars, no brackets).
     func keyterms(limit: Int = 200) -> [String] {

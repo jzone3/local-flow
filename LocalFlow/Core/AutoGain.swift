@@ -24,3 +24,26 @@ struct AutoGain {
 
     mutating func reset() { self = AutoGain() }
 }
+
+/// A short press with no sound in it: Whisper would invent a sentence ("Let's get started.") instead of staying
+/// silent, so a clip under `maxDuration` whose loudest tenth of a second stays below `threshold` dBFS is dropped.
+enum SpeechGate {
+    static let threshold: Float = -50
+    static let maxDuration: Double = 1
+
+    static func isSilentTap(_ samples: [Float], sampleRate: Int = 16_000) -> Bool {
+        Double(samples.count) / Double(sampleRate) < maxDuration && !hasSpeech(samples, sampleRate: sampleRate)
+    }
+
+    static func hasSpeech(_ samples: [Float], sampleRate: Int = 16_000) -> Bool {
+        let window = max(1, sampleRate / 10)
+        var start = 0
+        while start < samples.count {
+            let chunk = samples[start..<min(samples.count, start + window)]
+            let rms = sqrt(chunk.reduce(0) { $0 + $1 * $1 } / Float(chunk.count))
+            if 20 * log10(max(rms, 1e-6)) >= threshold { return true }
+            start += window
+        }
+        return false
+    }
+}

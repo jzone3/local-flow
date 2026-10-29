@@ -385,9 +385,8 @@ final class LocalWhisper: TranscriptionProvider {
         for i in 0..<whisper_full_n_segments(ctx) {
             guard let segment = whisper_full_get_segment_text(ctx, i) else { continue }
             let piece = String(cString: segment)
-            if hint.isEmpty || !Vocabulary.echoesPromptOpener(piece) { pieces.append(piece) }
+            if hint.isEmpty || !Vocabulary.isPromptEcho(piece) { pieces.append(piece) }
         }
-        let text = TextCleanup.dropTrailingSilenceEcho(pieces).joined().trimmingCharacters(in: .whitespacesAndNewlines)
-        return !hint.isEmpty && Vocabulary.isPromptEcho(text) ? "" : text
+        return TextCleanup.dropTrailingSilenceEcho(pieces).joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
