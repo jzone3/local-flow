@@ -141,9 +141,9 @@ final class DictationController: ObservableObject {
         hotkey.escapeArmed = false
         guard state == .listening else { return }
         let (samples, duration) = recorder.stop()
-        // Only an accidental tap is dropped. Quiet audio always goes to the model (a low input level is not silence);
-        // if the model hears nothing, `isHallucination` reports "Didn't catch anything."
-        guard duration > 0.35 else {
+        // An accidental tap, or a short press with no sound in it, returns nothing. Longer quiet audio still goes to
+        // the model (a low input level is not silence); if it hears nothing, `isHallucination` reports "Didn't catch anything."
+        guard duration > 0.35, !SpeechGate.isSilentTap(samples, sampleRate: Int(AudioRecorder.sampleRate)) else {
             state = .idle
             bar.hide()
             return
