@@ -94,10 +94,12 @@ struct Hotkey: Codable, Equatable {
 
 enum FnKeyAction: Equatable {
     case doNothing, changeInputSource, showEmoji, startDictation
+    /// Never set: Macs with a 🌐 key default to Show Emoji & Symbols or Change Input Source.
+    case systemDefault
 
-    /// An unset value reads as Do Nothing, which is what System Settings shows for it.
     init(usageType: Int?) {
         switch usageType {
+        case nil: self = .systemDefault
         case 1: self = .changeInputSource
         case 2: self = .showEmoji
         case 3: self = .startDictation
@@ -105,13 +107,14 @@ enum FnKeyAction: Equatable {
         }
     }
 
-    /// Finishes "Pressing Fn also …", or nil when there is no clash.
-    var clash: String? {
+    /// First sentence of the Setup/Settings note, or nil when there is no clash.
+    var note: String? {
         switch self {
         case .doNothing: return nil
-        case .changeInputSource: return "switches the input source"
-        case .showEmoji: return "opens Emoji & Symbols"
-        case .startDictation: return "starts Apple Dictation"
+        case .changeInputSource: return "Pressing Fn also switches the input source."
+        case .showEmoji: return "Pressing Fn also opens Emoji & Symbols."
+        case .startDictation: return "Pressing Fn also starts Apple Dictation."
+        case .systemDefault: return "Pressing Fn may also open Emoji & Symbols."
         }
     }
 }

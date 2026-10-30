@@ -378,10 +378,10 @@ struct OnboardingView: View {
                 .padding(12)
                 .card(cornerRadius: 10)
             }
-            if settings.hotkey.isFn, let clash = fnKeyAction.clash {
+            if settings.hotkey.isFn, let note = fnKeyAction.note {
                 HStack(spacing: 8) {
                     Icon("warning", size: 13).foregroundStyle(.orange)
-                    Text("Pressing Fn also \(clash). Set System Settings → Keyboard → “Press 🌐 key to” to Do Nothing. Fn+E still opens emoji.")
+                    Text("\(note) Set System Settings → Keyboard → “Press 🌐 key to” to Do Nothing. Fn+E still opens emoji.")
                         .font(.caption).foregroundStyle(.secondary)
                     Button("Open") {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
