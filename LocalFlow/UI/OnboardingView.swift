@@ -303,6 +303,7 @@ struct OnboardingView: View {
     }
 
     @State private var fnConflict = Hotkey.systemDictationUsesFnTwice
+    @State private var fnKeyAction = Hotkey.systemFnKeyAction
     @State private var tryText = ""
     @State private var sawHotkey = false
     @FocusState private var tryFocused: Bool
@@ -377,6 +378,19 @@ struct OnboardingView: View {
                 .padding(12)
                 .card(cornerRadius: 10)
             }
+            if settings.hotkey.isFn, let note = fnKeyAction.note {
+                HStack(spacing: 8) {
+                    Icon("warning", size: 13).foregroundStyle(.orange)
+                    Text("\(note) Set System Settings → Keyboard → “Press 🌐 key to” to Do Nothing. Fn+E still opens emoji.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Open") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                    }
+                    .actionButton().controlSize(.small)
+                }
+                .padding(12)
+                .card(cornerRadius: 10)
+            }
             if controller.permissionProblem != nil {
                 Label { Text("A permission is still missing; the key won't work until it's granted.") } icon: { Icon("warning", size: 14) }
                     .font(.callout).foregroundStyle(.orange)
@@ -384,6 +398,7 @@ struct OnboardingView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             fnConflict = Hotkey.systemDictationUsesFnTwice
+            fnKeyAction = Hotkey.systemFnKeyAction
         }
     }
 }

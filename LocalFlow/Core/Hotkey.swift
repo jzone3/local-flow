@@ -56,6 +56,12 @@ struct Hotkey: Codable, Equatable {
         return enabled && params.first?.intValue == 8_388_608
     }
 
+    /// What macOS does when Fn (🌐) is pressed on its own: System Settings → Keyboard → "Press 🌐 key to",
+    /// stored as AppleFnUsageType in com.apple.HIToolbox. Anything but Do Nothing also fires around our hold-to-talk.
+    static var systemFnKeyAction: FnKeyAction {
+        FnKeyAction(usageType: UserDefaults(suiteName: "com.apple.HIToolbox")?.object(forKey: "AppleFnUsageType") as? Int)
+    }
+
     var displayName: String {
         if let name = Hotkey.modifierKeyCodes[keyCode] { return name }
         return Hotkey.symbols(for: modifiers) + Hotkey.keyName(keyCode)
@@ -83,6 +89,33 @@ struct Hotkey: Codable, Equatable {
         if let s = special[code] { return s }
         let letters: [UInt16: String] = [0: "A", 11: "B", 8: "C", 2: "D", 14: "E", 3: "F", 5: "G", 4: "H", 34: "I", 38: "J", 40: "K", 37: "L", 46: "M", 45: "N", 31: "O", 35: "P", 12: "Q", 15: "R", 1: "S", 17: "T", 32: "U", 9: "V", 13: "W", 7: "X", 16: "Y", 6: "Z", 29: "0", 18: "1", 19: "2", 20: "3", 21: "4", 23: "5", 22: "6", 26: "7", 28: "8", 25: "9"]
         return letters[code] ?? "Key \(code)"
+    }
+}
+
+enum FnKeyAction: Equatable {
+    case doNothing, changeInputSource, showEmoji, startDictation
+    /// Never set: Macs with a 🌐 key default to Show Emoji & Symbols or Change Input Source.
+    case systemDefault
+
+    init(usageType: Int?) {
+        switch usageType {
+        case nil: self = .systemDefault
+        case 1: self = .changeInputSource
+        case 2: self = .showEmoji
+        case 3: self = .startDictation
+        default: self = .doNothing
+        }
+    }
+
+    /// First sentence of the Setup/Settings note, or nil when there is no clash.
+    var note: String? {
+        switch self {
+        case .doNothing: return nil
+        case .changeInputSource: return "Pressing Fn also switches the input source."
+        case .showEmoji: return "Pressing Fn also opens Emoji & Symbols."
+        case .startDictation: return "Pressing Fn also starts Apple Dictation."
+        case .systemDefault: return "Pressing Fn may also open Emoji & Symbols."
+        }
     }
 }
 
