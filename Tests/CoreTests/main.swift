@@ -386,4 +386,14 @@ var flatLevel: Float = 1
 for _ in 0..<300 { flatLevel = steady.level(rms: 0.001) }
 expect(flatLevel < 0.1, "autogain: steady noise alone is not a waveform (\(flatLevel))")
 
+// FnKeyAction (System Settings → Keyboard → "Press 🌐 key to")
+expect(FnKeyAction(usageType: nil) == .doNothing, "fn action: unset reads as Do Nothing")
+expect(FnKeyAction(usageType: 0) == .doNothing, "fn action: 0 is Do Nothing")
+expect(FnKeyAction(usageType: 1) == .changeInputSource, "fn action: 1 is input source")
+expect(FnKeyAction(usageType: 2) == .showEmoji, "fn action: 2 is emoji")
+expect(FnKeyAction(usageType: 3) == .startDictation, "fn action: 3 is dictation")
+expect(FnKeyAction(usageType: 9) == .doNothing, "fn action: unknown value is Do Nothing")
+expect(FnKeyAction.doNothing.clash == nil, "fn action: no note for Do Nothing")
+expect(FnKeyAction.showEmoji.clash ?? "", "opens Emoji & Symbols", "fn action: emoji note")
+
 if failures == 0 { print("core tests passed") } else { print("\(failures) failure(s)"); exit(1) }
