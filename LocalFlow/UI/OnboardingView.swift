@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// First-run setup: welcome → permissions → local model → cloud? → (cloud keys) → dictionary → done.
+/// First-run setup: welcome → permissions → (🌐 key) → local model → cloud? → (cloud keys) → dictionary → done.
 struct OnboardingView: View {
     static let windowSize = NSSize(width: 540, height: 600)
 
-    enum Step: Hashable { case welcome, permissions, localModel, cloudIntro, cloudKeys, dictionary, done }
+    enum Step: Hashable { case welcome, permissions, fnKey, localModel, cloudIntro, cloudKeys, dictionary, done }
 
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var controller = DictationController.shared
@@ -13,10 +13,12 @@ struct OnboardingView: View {
     @State private var wantsCloud = false  // adds the cloud-keys step after "Set up cloud?"
     @State private var foundKeys: [EnvironmentKeys.Found] = []
     @State private var keyChanged = 0
+    // Decided once so the step doesn't vanish from under the user when they fix the setting.
+    @State private var showsFnStep = AppSettings.shared.hotkey.isFn && Hotkey.systemFnKeyAction.note != nil
 
     private var steps: [Step] {
-        wantsCloud ? [.welcome, .permissions, .localModel, .cloudIntro, .cloudKeys, .dictionary, .done]
-                   : [.welcome, .permissions, .localModel, .cloudIntro, .dictionary, .done]
+        [.welcome, .permissions] + (showsFnStep ? [.fnKey] : []) + [.localModel, .cloudIntro]
+            + (wantsCloud ? [.cloudKeys] : []) + [.dictionary, .done]
     }
     private var stepCount: Int { steps.count }
     private var current: Step { steps[min(step, steps.count - 1)] }
@@ -27,6 +29,7 @@ struct OnboardingView: View {
                 switch current {
                 case .welcome: welcome
                 case .permissions: permissions
+                case .fnKey: fnKey
                 case .localModel: localModel
                 case .cloudIntro: cloudIntro
                 case .cloudKeys: cloudKeys
@@ -187,6 +190,30 @@ struct OnboardingView: View {
             controller.refreshPermissions()
             // Accessibility is granted over in System Settings; once the switch flips, come back so the user isn't left there.
             if !hadAccessibility && controller.hasAccessibility { WindowManager.shared.bringToFront("onboarding") }
+        }
+    }
+
+    private var fnKey: some View {
+        VStack(spacing: 26) {
+            header("Turn off the 🌐 key shortcut", "Pressing 🌐 to dictate can also open emoji or switch your keyboard. Set “Press 🌐 key to” to Do Nothing.", icon: "keyboard")
+            row("keyboard", "Press 🌐 key to", fnKeyAction == .doNothing ? "Do Nothing. You're all set." : "Fn+E still opens emoji after you change it.") {
+                if fnKeyAction == .doNothing {
+                    Icon("check-circle", size: 20).foregroundStyle(.green)
+                } else {
+                    Icon("warning", size: 20).foregroundStyle(.orange)
+                }
+            }
+            .card()
+            Button("Open Keyboard Settings") {
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+            }
+            .actionButton()
+            Text("Optional. You can skip this and change it later.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+        .onAppear { fnKeyAction = Hotkey.systemFnKeyAction }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            fnKeyAction = Hotkey.systemFnKeyAction
         }
     }
 
@@ -378,19 +405,6 @@ struct OnboardingView: View {
                 .padding(12)
                 .card(cornerRadius: 10)
             }
-            if settings.hotkey.isFn, let note = fnKeyAction.note {
-                HStack(spacing: 8) {
-                    Icon("warning", size: 13).foregroundStyle(.orange)
-                    Text("\(note) Set System Settings → Keyboard → “Press 🌐 key to” to Do Nothing. Fn+E still opens emoji.")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Button("Open") {
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
-                    }
-                    .actionButton().controlSize(.small)
-                }
-                .padding(12)
-                .card(cornerRadius: 10)
-            }
             if controller.permissionProblem != nil {
                 Label { Text("A permission is still missing; the key won't work until it's granted.") } icon: { Icon("warning", size: 14) }
                     .font(.callout).foregroundStyle(.orange)
@@ -398,7 +412,6 @@ struct OnboardingView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             fnConflict = Hotkey.systemDictationUsesFnTwice
-            fnKeyAction = Hotkey.systemFnKeyAction
         }
     }
 }
