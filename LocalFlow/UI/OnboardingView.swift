@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// First-run setup: welcome → permissions → (🌐 key) → local model → cloud? → (cloud keys) → dictionary → done.
+/// First-run setup: welcome → permissions → local model → cloud? → (cloud keys) → dictionary → done.
 struct OnboardingView: View {
     static let windowSize = NSSize(width: 540, height: 600)
 
-    enum Step: Hashable { case welcome, permissions, fnKey, localModel, cloudIntro, cloudKeys, dictionary, done }
+    enum Step: Hashable { case welcome, permissions, localModel, cloudIntro, cloudKeys, dictionary, done }
 
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var controller = DictationController.shared
@@ -13,11 +13,11 @@ struct OnboardingView: View {
     @State private var wantsCloud = false  // adds the cloud-keys step after "Set up cloud?"
     @State private var foundKeys: [EnvironmentKeys.Found] = []
     @State private var keyChanged = 0
-    // Decided once so the step doesn't vanish from under the user when they fix the setting.
-    @State private var showsFnStep = AppSettings.shared.hotkey.isFn && Hotkey.systemFnKeyAction.note != nil
+    // Decided once so the row stays (as a check) after the user turns the shortcut off.
+    @State private var showsFnRow = AppSettings.shared.hotkey.isFn && Hotkey.systemFnKeyAction.note != nil
 
     private var steps: [Step] {
-        [.welcome, .permissions] + (showsFnStep ? [.fnKey] : []) + [.localModel, .cloudIntro]
+        [.welcome, .permissions, .localModel, .cloudIntro]
             + (wantsCloud ? [.cloudKeys] : []) + [.dictionary, .done]
     }
     private var stepCount: Int { steps.count }
@@ -29,7 +29,6 @@ struct OnboardingView: View {
                 switch current {
                 case .welcome: welcome
                 case .permissions: permissions
-                case .fnKey: fnKey
                 case .localModel: localModel
                 case .cloudIntro: cloudIntro
                 case .cloudKeys: cloudKeys
@@ -150,7 +149,7 @@ struct OnboardingView: View {
     private var hasPermissions: Bool { controller.hasMicrophone && controller.hasAccessibility }
 
     private var permissions: some View {
-        VStack(spacing: 26) {
+        VStack(spacing: showsFnRow ? 22 : 26) {
             header("Two permissions", "macOS asks for these so Local Flow can hear you and type for you.", icon: "hand")
             VStack(spacing: 0) {
                 permissionRow("mic", "Microphone", granted: controller.hasMicrophone, detail: "To record while you hold the key.") {
@@ -171,6 +170,20 @@ struct OnboardingView: View {
                     HotkeyMonitor.requestAccessibility()
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                 }
+                if showsFnRow {
+                    rowDivider
+                    row("keyboard", "🌐 key shortcut", "Turn off so holding Fn doesn't open emoji.") {
+                        if fnKeyAction == .doNothing {
+                            Icon("check-circle", size: 20).foregroundStyle(.green)
+                        } else {
+                            Button("Turn Off") {
+                                Hotkey.turnOffSystemFnKeyAction()
+                                fnKeyAction = Hotkey.systemFnKeyAction
+                            }
+                            .actionButton()
+                        }
+                    }
+                }
             }
             .card()
             VStack(spacing: 8) {
@@ -183,47 +196,17 @@ struct OnboardingView: View {
                     .font(.callout)
             }
         }
-        .onAppear { controller.refreshPermissions() }
+        .onAppear {
+            controller.refreshPermissions()
+            fnKeyAction = Hotkey.systemFnKeyAction
+        }
         // Grants happen in System Settings, so poll while this step is showing; the rows flip to a check on their own.
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             let hadAccessibility = controller.hasAccessibility
             controller.refreshPermissions()
+            fnKeyAction = Hotkey.systemFnKeyAction
             // Accessibility is granted over in System Settings; once the switch flips, come back so the user isn't left there.
             if !hadAccessibility && controller.hasAccessibility { WindowManager.shared.bringToFront("onboarding") }
-        }
-    }
-
-    private var fnKey: some View {
-        VStack(spacing: 26) {
-            header("Turn off the 🌐 key shortcut", "Pressing 🌐 to dictate can also open emoji or switch your keyboard. Local Flow can turn that off for you.", icon: "keyboard")
-            row("keyboard", "Press 🌐 key to", fnKeyAction == .doNothing ? "Do Nothing. You're all set." : "Fn+E still opens emoji after you turn it off.") {
-                if fnKeyAction == .doNothing {
-                    Icon("check-circle", size: 20).foregroundStyle(.green)
-                } else {
-                    Icon("warning", size: 20).foregroundStyle(.orange)
-                }
-            }
-            .card()
-            VStack(spacing: 10) {
-                Button("Turn Off 🌐 Shortcut") {
-                    Hotkey.turnOffSystemFnKeyAction()
-                    fnKeyAction = Hotkey.systemFnKeyAction
-                }
-                .actionButton(prominent: true)
-                .controlSize(.large)
-                .disabled(fnKeyAction == .doNothing)
-                Button("Open Keyboard Settings") {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
-                }
-                .buttonStyle(.link)
-                .font(.callout)
-            }
-            Text("Optional. You can skip this and change it later.")
-                .font(.callout).foregroundStyle(.secondary)
-        }
-        .onAppear { fnKeyAction = Hotkey.systemFnKeyAction }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            fnKeyAction = Hotkey.systemFnKeyAction
         }
     }
 
