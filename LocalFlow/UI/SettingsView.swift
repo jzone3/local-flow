@@ -41,13 +41,14 @@ struct GeneralSettings: View {
                 if settings.hotkey.isFn, let note = fnKeyAction.note {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Icon("warning", size: 13).foregroundStyle(.orange)
-                        Text("\(note) Set System Settings → Keyboard → “Press 🌐 key to” to Do Nothing. Fn+E still opens emoji.")
+                        Text("\(note) Turn off “Press 🌐 key to” so it doesn't. Fn+E still opens emoji.")
                             .font(.caption).foregroundStyle(.secondary)
                         Spacer()
-                        Button("Open Keyboard Settings") {
-                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                        Button("Turn Off 🌐 Shortcut") {
+                            Hotkey.turnOffSystemFnKeyAction()
+                            fnKeyAction = Hotkey.systemFnKeyAction
                         }
-                        .actionButton().controlSize(.small)
+                        .actionButton(prominent: true).controlSize(.small)
                     }
                 }
             }

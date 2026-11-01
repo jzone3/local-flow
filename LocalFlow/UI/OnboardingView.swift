@@ -195,8 +195,8 @@ struct OnboardingView: View {
 
     private var fnKey: some View {
         VStack(spacing: 26) {
-            header("Turn off the 🌐 key shortcut", "Pressing 🌐 to dictate can also open emoji or switch your keyboard. Set “Press 🌐 key to” to Do Nothing.", icon: "keyboard")
-            row("keyboard", "Press 🌐 key to", fnKeyAction == .doNothing ? "Do Nothing. You're all set." : "Fn+E still opens emoji after you change it.") {
+            header("Turn off the 🌐 key shortcut", "Pressing 🌐 to dictate can also open emoji or switch your keyboard. Local Flow can turn that off for you.", icon: "keyboard")
+            row("keyboard", "Press 🌐 key to", fnKeyAction == .doNothing ? "Do Nothing. You're all set." : "Fn+E still opens emoji after you turn it off.") {
                 if fnKeyAction == .doNothing {
                     Icon("check-circle", size: 20).foregroundStyle(.green)
                 } else {
@@ -204,10 +204,20 @@ struct OnboardingView: View {
                 }
             }
             .card()
-            Button("Open Keyboard Settings") {
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+            VStack(spacing: 10) {
+                Button("Turn Off 🌐 Shortcut") {
+                    Hotkey.turnOffSystemFnKeyAction()
+                    fnKeyAction = Hotkey.systemFnKeyAction
+                }
+                .actionButton(prominent: true)
+                .controlSize(.large)
+                .disabled(fnKeyAction == .doNothing)
+                Button("Open Keyboard Settings") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!)
+                }
+                .buttonStyle(.link)
+                .font(.callout)
             }
-            .actionButton()
             Text("Optional. You can skip this and change it later.")
                 .font(.callout).foregroundStyle(.secondary)
         }

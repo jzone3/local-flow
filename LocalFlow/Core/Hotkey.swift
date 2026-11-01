@@ -59,7 +59,41 @@ struct Hotkey: Codable, Equatable {
     /// What macOS does when Fn (🌐) is pressed on its own: System Settings → Keyboard → "Press 🌐 key to",
     /// stored as AppleFnUsageType in com.apple.HIToolbox. Anything but Do Nothing also fires around our hold-to-talk.
     static var systemFnKeyAction: FnKeyAction {
-        FnKeyAction(usageType: UserDefaults(suiteName: "com.apple.HIToolbox")?.object(forKey: "AppleFnUsageType") as? Int)
+        FnKeyAction(usageType: systemFnUsageType)
+    }
+
+    private static var systemFnUsageType: Int? {
+        UserDefaults(suiteName: "com.apple.HIToolbox")?.object(forKey: "AppleFnUsageType") as? Int
+    }
+
+    /// The "Press 🌐 key to" value before Local Flow turned it off; -1 means it was never set.
+    static let previousFnUsageTypeKey = "previousFnUsageType"
+
+    /// Sets "Press 🌐 key to" to Do Nothing the way System Settings does, so it takes effect without a logout.
+    /// Returns whether the setting now reads Do Nothing.
+    @discardableResult
+    static func turnOffSystemFnKeyAction() -> Bool {
+        let current = systemFnUsageType
+        if current != 0, UserDefaults.standard.object(forKey: previousFnUsageTypeKey) == nil {
+            UserDefaults.standard.set(current ?? -1, forKey: previousFnUsageTypeKey)
+        }
+        setSystemFnUsageType(0)
+        return systemFnKeyAction == .doNothing
+    }
+
+    private static func setSystemFnUsageType(_ value: Int) {
+        // System Settings' Keyboard pane calls HIToolbox's TISUpdateFnUsageType: it saves the pref and tells running apps.
+        typealias Update = @convention(c) (Int32) -> Int32
+        if let lib = dlopen("/System/Library/Frameworks/Carbon.framework/Frameworks/HIToolbox.framework/HIToolbox", RTLD_LAZY),
+           let symbol = dlsym(lib, "TISUpdateFnUsageType") {
+            _ = unsafeBitCast(symbol, to: Update.self)(Int32(value))
+            return
+        }
+        let domain = "com.apple.HIToolbox" as CFString
+        CFPreferencesSetValue("AppleFnUsageType" as CFString, value as CFNumber, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        CFPreferencesSynchronize(domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("AppleKeyboardPreferencesFnKeySettingChangedNotification"), object: nil, userInfo: nil, deliverImmediately: true)
     }
 
     var displayName: String {
