@@ -61,6 +61,8 @@ expect(TextCleanup.clean("hey are you coming."), "Hey are you coming.", "standar
 
 expect(TextCleanup.isHallucination("Thanks for watching!"), "hallucination: thanks for watching")
 expect(TextCleanup.isHallucination(" you "), "hallucination: lone you")
+expect(TextCleanup.isHallucination(" Let's get started."), "hallucination: lone let's get started")
+expect(!TextCleanup.isHallucination("Okay, let's get started on the report."), "let's get started inside a sentence kept")
 expect(TextCleanup.isHallucination(""), "hallucination: empty")
 expect(!TextCleanup.isHallucination("Thank you for the help today."), "real sentence kept")
 expect(!TextCleanup.isHallucination("Thank you."), "short real reply kept")
