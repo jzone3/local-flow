@@ -32,6 +32,7 @@ final class DictationController: ObservableObject {
     private let bar = DictationBarPanel()
     private var transcription: Task<Void, Never>?
     private var hideWork: DispatchWorkItem?
+    private var showWork: DispatchWorkItem?
     private var cancellables: Set<AnyCancellable> = []
     private var startedAt: Date?
     private var profile: CleanupProfile = .standard
@@ -57,6 +58,7 @@ final class DictationController: ObservableObject {
         hotkey.onPress = { [weak self] in self?.hotkeyPressed() }
         hotkey.onRelease = { [weak self] in self?.hotkeyReleased() }
         hotkey.onCancel = { [weak self] in self?.cancel() }
+        hotkey.onChord = { [weak self] in self?.hotkeyChorded() }
         hotkey.start()
         settings.$hotkey.dropFirst().sink { [weak self] key in self?.hotkey.update(hotkey: key) }.store(in: &cancellables)
         bar.attach(recorder: recorder, controller: self)
@@ -109,6 +111,13 @@ final class DictationController: ObservableObject {
         endRecording()
     }
 
+    /// Fn+E, Fn+Delete and the like: the user wanted the shortcut, so drop the recording without a trace.
+    private func hotkeyChorded() {
+        lastTapAt = nil
+        ignoreNextRelease = false
+        cancel()
+    }
+
     private func beginRecording() {
         guard !state.isActive else { return }
         transcription?.cancel()
@@ -129,8 +138,17 @@ final class DictationController: ObservableObject {
             startedAt = Date()
             profile = Self.targetProfile()
             state = .listening
-            if settings.playSounds { NSSound(named: "Tink")?.play() }
-            bar.show()
+            // A lone-modifier hotkey can turn out to be the start of a shortcut (Fn+E); wait a beat before showing
+            // the bar so those don't flash it. Recording has already started, so no speech is lost.
+            let delay: TimeInterval = settings.hotkey.isModifierOnly ? 0.2 : 0
+            showWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, state == .listening else { return }
+                if settings.playSounds { NSSound(named: "Tink")?.play() }
+                bar.show()
+            }
+            showWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
         } catch {
             show(failure: error.localizedDescription)
         }

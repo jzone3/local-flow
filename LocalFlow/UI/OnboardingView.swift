@@ -13,10 +13,12 @@ struct OnboardingView: View {
     @State private var wantsCloud = false  // adds the cloud-keys step after "Set up cloud?"
     @State private var foundKeys: [EnvironmentKeys.Found] = []
     @State private var keyChanged = 0
+    // Decided once so the row stays (as a check) after the user turns the shortcut off.
+    @State private var showsFnRow = AppSettings.shared.hotkey.isFn && Hotkey.systemFnKeyAction.note != nil
 
     private var steps: [Step] {
-        wantsCloud ? [.welcome, .permissions, .localModel, .cloudIntro, .cloudKeys, .dictionary, .done]
-                   : [.welcome, .permissions, .localModel, .cloudIntro, .dictionary, .done]
+        [.welcome, .permissions, .localModel, .cloudIntro]
+            + (wantsCloud ? [.cloudKeys] : []) + [.dictionary, .done]
     }
     private var stepCount: Int { steps.count }
     private var current: Step { steps[min(step, steps.count - 1)] }
@@ -147,7 +149,7 @@ struct OnboardingView: View {
     private var hasPermissions: Bool { controller.hasMicrophone && controller.hasAccessibility }
 
     private var permissions: some View {
-        VStack(spacing: 26) {
+        VStack(spacing: showsFnRow ? 22 : 26) {
             header("Two permissions", "macOS asks for these so Local Flow can hear you and type for you.", icon: "hand")
             VStack(spacing: 0) {
                 permissionRow("mic", "Microphone", granted: controller.hasMicrophone, detail: "To record while you hold the key.") {
@@ -168,6 +170,20 @@ struct OnboardingView: View {
                     HotkeyMonitor.requestAccessibility()
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
                 }
+                if showsFnRow {
+                    rowDivider
+                    row("keyboard", "🌐 key shortcut", "Turn off so holding Fn doesn't open emoji.") {
+                        if fnKeyAction == .doNothing {
+                            Icon("check-circle", size: 20).foregroundStyle(.green)
+                        } else {
+                            Button("Turn Off") {
+                                Hotkey.turnOffSystemFnKeyAction()
+                                fnKeyAction = Hotkey.systemFnKeyAction
+                            }
+                            .actionButton()
+                        }
+                    }
+                }
             }
             .card()
             VStack(spacing: 8) {
@@ -180,11 +196,15 @@ struct OnboardingView: View {
                     .font(.callout)
             }
         }
-        .onAppear { controller.refreshPermissions() }
+        .onAppear {
+            controller.refreshPermissions()
+            fnKeyAction = Hotkey.systemFnKeyAction
+        }
         // Grants happen in System Settings, so poll while this step is showing; the rows flip to a check on their own.
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             let hadAccessibility = controller.hasAccessibility
             controller.refreshPermissions()
+            fnKeyAction = Hotkey.systemFnKeyAction
             // Accessibility is granted over in System Settings; once the switch flips, come back so the user isn't left there.
             if !hadAccessibility && controller.hasAccessibility { WindowManager.shared.bringToFront("onboarding") }
         }
@@ -303,6 +323,7 @@ struct OnboardingView: View {
     }
 
     @State private var fnConflict = Hotkey.systemDictationUsesFnTwice
+    @State private var fnKeyAction = Hotkey.systemFnKeyAction
     @State private var tryText = ""
     @State private var sawHotkey = false
     @FocusState private var tryFocused: Bool

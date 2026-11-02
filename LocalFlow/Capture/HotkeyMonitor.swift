@@ -9,6 +9,7 @@ final class HotkeyMonitor {
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
     var onCancel: (() -> Void)?  // Esc while holding
+    var onChord: (() -> Void)?  // another key pressed while a lone-modifier hotkey is held (Fn+E, Fn+←…)
 
     private var globalMonitors: [Any] = []
     private var localMonitors: [Any] = []
@@ -71,6 +72,11 @@ final class HotkeyMonitor {
             return true
         }
         if hotkey.isModifierOnly {
+            if isDown, event.type == .keyDown {  // a shortcut, not a dictation: drop it and let the key through
+                isDown = false
+                onChord?()
+                return false
+            }
             guard event.type == .flagsChanged, event.keyCode == hotkey.keyCode else { return false }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             let wanted = NSEvent.ModifierFlags(rawValue: hotkey.modifiers)

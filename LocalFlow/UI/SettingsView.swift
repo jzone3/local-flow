@@ -16,6 +16,7 @@ struct SettingsView: View {
 
 struct GeneralSettings: View {
     @State private var fnConflict = Hotkey.systemDictationUsesFnTwice
+    @State private var fnKeyAction = Hotkey.systemFnKeyAction
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var controller = DictationController.shared
 
@@ -37,10 +38,27 @@ struct GeneralSettings: View {
                         .actionButton().controlSize(.small)
                     }
                 }
+                if settings.hotkey.isFn, let note = fnKeyAction.note {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Icon("warning", size: 13).foregroundStyle(.orange)
+                        Text("\(note) Turn off “Press 🌐 key to” so it doesn't. Fn+E still opens emoji.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Turn Off 🌐 Shortcut") {
+                            Hotkey.turnOffSystemFnKeyAction()
+                            fnKeyAction = Hotkey.systemFnKeyAction
+                        }
+                        .actionButton(prominent: true).controlSize(.small)
+                    }
+                }
             }
-            .onAppear { fnConflict = Hotkey.systemDictationUsesFnTwice }
+            .onAppear {
+                fnConflict = Hotkey.systemDictationUsesFnTwice
+                fnKeyAction = Hotkey.systemFnKeyAction
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 fnConflict = Hotkey.systemDictationUsesFnTwice
+                fnKeyAction = Hotkey.systemFnKeyAction
                 controller.refreshPermissions()   // the user usually comes back from System Settings
             }
             Section("Microphone") {
