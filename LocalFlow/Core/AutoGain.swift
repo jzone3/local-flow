@@ -25,7 +25,7 @@ struct AutoGain {
     mutating func reset() { self = AutoGain() }
 }
 
-/// A short press with no sound in it: Whisper would invent a sentence ("Let's get started.") instead of staying
+/// A short press with no sound in it: Whisper would invent a sentence ("Thank you.") instead of staying
 /// silent, so a clip under `maxDuration` whose loudest tenth of a second stays below `threshold` dBFS is dropped.
 enum SpeechGate {
     static let threshold: Float = -50
