@@ -61,6 +61,8 @@ expect(TextCleanup.clean("hey are you coming."), "Hey are you coming.", "standar
 
 expect(TextCleanup.isHallucination("Thanks for watching!"), "hallucination: thanks for watching")
 expect(TextCleanup.isHallucination(" you "), "hallucination: lone you")
+expect(TextCleanup.isHallucination(" Let's get started."), "hallucination: lone let's get started")
+expect(!TextCleanup.isHallucination("Okay, let's get started on the report."), "let's get started inside a sentence kept")
 expect(TextCleanup.isHallucination(""), "hallucination: empty")
 expect(!TextCleanup.isHallucination("Thank you for the help today."), "real sentence kept")
 expect(!TextCleanup.isHallucination("Thank you."), "short real reply kept")
@@ -102,7 +104,8 @@ expect(vocab.applySpelling(to: "devinsdinner"), "devinsdinner", "no partial word
 expect(vocab.applySpelling(to: "Ask Devon. Devon's PR is up"), "Ask Devin. Devin's PR is up", "sound-alike: Devon → Devin")
 expect(Vocabulary(text: "Devin\nDevon").applySpelling(to: "Devon and Devin"), "Devon and Devin", "sound-alike kept when it's in the dictionary too")
 expect(Vocabulary(text: "GitHub").applySpelling(to: "Devon"), "Devon", "sound-alike only when the term is in the dictionary")
-expect(vocab.promptHint(limit: 3), "Okay, so here are some names and terms I use a lot: GitHub, ChatGPT and Next.js. Let's get started.", "prompt hint")
+expect(vocab.promptHint(limit: 3), "Okay, so here are some names and terms I use a lot: GitHub, ChatGPT and Next.js.", "prompt hint")
+expect(!vocab.promptHint().lowercased().contains("let's get started"), "prompt hint has no closer to echo")
 expect(Vocabulary.isPromptEcho(" Okay, so here are some names and terms I use a lot."), "prompt echo: opener")
 expect(Vocabulary.isPromptEcho(vocab.promptHint(limit: 3)), "prompt echo: whole hint")
 expect(!Vocabulary.isPromptEcho(" Here are some names for the team: GitHub and ChatGPT."), "prompt echo: real speech kept")

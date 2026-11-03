@@ -55,11 +55,12 @@ struct Vocabulary: Equatable {
         guard !picked.isEmpty else { return "" }
         // A plain spoken sentence, not a bare list: a comma list of capitalized terms biases Whisper into Title Case.
         let list = picked.count > 1 ? picked.dropLast().joined(separator: ", ") + " and " + picked.last! : picked[0]
-        return Self.promptOpener + list + ". " + Self.promptCloser
+        // No closing sentence after the list: Whisper reads the hint's last sentence back on quiet audio, and a
+        // closer like "Let's get started." came out as the whole transcript.
+        return Self.promptOpener + list + "."
     }
 
     static let promptOpener = "Okay, so here are some names and terms I use a lot: "
-    static let promptCloser = "Let's get started."
 
     /// True when a piece of transcript is the hint read back rather than speech: on a quiet window Whisper
     /// sometimes echoes its prompt instead of staying silent. The opener is long enough that real speech never

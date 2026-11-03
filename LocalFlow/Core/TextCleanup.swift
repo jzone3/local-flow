@@ -77,6 +77,7 @@ enum TextCleanup {
         "please subscribe", "like and subscribe", "don't forget to subscribe", "see you in the next video",
         "see you next time", "subtitles by the amara org community", "subtitles by amara org", "transcribed by",
         "the end", "you", "bye", "music", "silence", "blank audio", "inaudible", "foreign",
+        "let s get started",  // the old dictionary hint's closer; Whisper still invents it for a near-silent press
     ]
 
     static func isHallucination(_ text: String) -> Bool {
