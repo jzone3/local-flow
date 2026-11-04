@@ -51,7 +51,12 @@ struct Vocabulary: Equatable {
 
     /// Terms as a hint for the speech model. Whisper's prompt window is ~224 tokens, so the list is capped.
     func promptHint(limit: Int = 80) -> String {
-        let picked = Array(terms.prefix(limit))
+        // Own words, then word-pack words, then the shipped base list, so the cap cuts the base list first.
+        let base = Set(Vocabulary(text: Self.defaultText).terms.map { $0.lowercased() })
+        let pack = Set(VocabularyPack.all.flatMap(\.terms).map { $0.lowercased() }).subtracting(base)
+        let rank = { (t: String) -> Int in base.contains(t.lowercased()) ? 2 : pack.contains(t.lowercased()) ? 1 : 0 }
+        let ordered = (0...2).flatMap { r in terms.filter { rank($0) == r } }
+        let picked = Array(ordered.prefix(limit))
         guard !picked.isEmpty else { return "" }
         // A plain spoken sentence, not a bare list: a comma list of capitalized terms biases Whisper into Title Case.
         let list = picked.count > 1 ? picked.dropLast().joined(separator: ", ") + " and " + picked.last! : picked[0]

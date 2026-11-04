@@ -10,6 +10,11 @@ struct VocabularyPack: Identifiable, Equatable {
 
     static let all: [VocabularyPack] = [
         VocabularyPack(id: "engineering", name: "Software engineer", icon: "pack-engineering", terms: [
+            // AI models, labs and tools first: Whisper misses these most, and the prompt hint keeps the first ones.
+            "GPT-5", "GPT-4o", "o3", "Codex", "Sora", "DALL-E", "Sonnet", "Opus", "Haiku", "Grok", "xAI", "Llama",
+            "Mistral", "DeepSeek", "Qwen", "Kimi", "Perplexity", "Hugging Face", "Windsurf", "Replit", "Lovable", "v0",
+            "Ollama", "LangChain", "PyTorch", "CUDA", "Nvidia", "Jupyter", "Midjourney", "ElevenLabs", "NotebookLM",
+            "Vertex AI", "Bedrock", "Groq", "Cerebras", "fine-tune", "embeddings", "Terra", "WTC",
             "React", "Node.js", "Rust", "Go", "Swift", "SwiftUI", "Xcode", "VS Code", "Docker", "AWS", "GCP", "Azure",
             "Terraform", "GraphQL", "REST", "OAuth", "JSON", "YAML", "CLI", "regex", "npm", "pnpm", "Git", "pull request",
             "refactor", "backend", "frontend", "DevOps", "Redis", "MongoDB", "Supabase", "Datadog", "Sentry", "webhook",
