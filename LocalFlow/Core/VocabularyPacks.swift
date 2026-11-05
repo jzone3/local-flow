@@ -62,6 +62,22 @@ struct VocabularyPack: Identifiable, Equatable {
     /// Rewrites `text` so it contains exactly the selected packs' terms on top of whatever else is in it.
     /// Terms the user typed, the base list and rules are left alone; only terms that belong solely to a
     /// now-deselected pack are removed.
+    /// Words that the selected packs gained in an app update, added to the user's list on launch. `offered` holds every
+    /// pack word already added once, so a word the user deleted stays deleted.
+    static func addNewTerms(selected: Set<String>, offered: Set<String>, to text: String) -> (text: String, offered: Set<String>) {
+        let packTerms = all.filter { selected.contains($0.id) }.flatMap(\.terms)
+        let existing = Set(Vocabulary(text: text).terms.map { $0.lowercased() })
+        var seen = Set<String>()
+        let add = packTerms.filter {
+            !offered.contains($0.lowercased()) && !existing.contains($0.lowercased()) && seen.insert($0.lowercased()).inserted
+        }
+        let nowOffered = offered.union(packTerms.map { $0.lowercased() })
+        guard !add.isEmpty else { return (text, nowOffered) }
+        var lines = text.components(separatedBy: .newlines)
+        while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true { lines.removeLast() }
+        return ((lines + add).joined(separator: "\n"), nowOffered)
+    }
+
     static func apply(selected: Set<String>, previouslySelected: Set<String>, to text: String) -> String {
         let keep = Set((Vocabulary(text: Vocabulary.defaultText).terms
             + all.filter { selected.contains($0.id) }.flatMap(\.terms)).map { $0.lowercased() })
