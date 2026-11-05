@@ -137,6 +137,16 @@ expect(t.contains("cap table") && t.contains("MyOwnWord") && t.contains("GitHub"
 expect(t.contains("QuickBooks"), "term shared with a still-selected pack kept")
 let none = VocabularyPack.apply(selected: [], previouslySelected: ["founder"], to: backToFounder)
 expect(Vocabulary(text: none) == Vocabulary(text: base), "removing all packs restores the original list")
+let oldEng = base + "\nTerraform\nMyOwnWord"
+let upgraded = VocabularyPack.addNewTerms(selected: ["engineering"], offered: ["terraform", "docker"], to: oldEng)
+let upTerms = Vocabulary(text: upgraded.text).terms
+expect(upTerms.contains("Grok") && upTerms.contains("WTC") && upTerms.contains("MyOwnWord"), "update adds new pack words, keeps own words")
+expect(!upTerms.contains("Docker"), "update doesn't bring back a pack word the user deleted")
+expect(upTerms.filter { $0.lowercased() == "terraform" }.count == 1, "update doesn't duplicate words already there")
+expect(upgraded.offered.contains("grok") && upgraded.offered.contains("react"), "update remembers what it added")
+let again = VocabularyPack.addNewTerms(selected: ["engineering"], offered: upgraded.offered, to: upgraded.text.replacingOccurrences(of: "\nGrok", with: ""))
+expect(!Vocabulary(text: again.text).terms.contains("Grok"), "a word deleted after the update stays deleted")
+expect(VocabularyPack.addNewTerms(selected: [], offered: [], to: base).text == base, "no packs: list unchanged")
 for p in VocabularyPack.all { expect(Set(p.terms.map { $0.lowercased() }).count == p.terms.count, "no duplicates inside pack \(p.id)") }
 expect(vocab.keyterms().contains("Local Flow"), "keyterms")
 

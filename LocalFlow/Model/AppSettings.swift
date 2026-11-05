@@ -64,6 +64,20 @@ final class AppSettings: ObservableObject {
         playSounds = defaults.object(forKey: "playSounds") as? Bool ?? !defaults.bool(forKey: "onboardingDone")
         inputDeviceUID = defaults.string(forKey: "inputDeviceUID")
         onboardingDone = defaults.bool(forKey: "onboardingDone")
+        addNewPackTerms()
+    }
+
+    /// Pack words already added once (lowercased); see `VocabularyPack.addNewTerms`.
+    private var offeredPackTerms: Set<String> {
+        get { Set(defaults.stringArray(forKey: "offeredPackTerms") ?? []) }
+        set { defaults.set(newValue.sorted(), forKey: "offeredPackTerms") }
+    }
+
+    private func addNewPackTerms() {
+        guard !dictionaryPacks.isEmpty else { return }
+        let result = VocabularyPack.addNewTerms(selected: Set(dictionaryPacks), offered: offeredPackTerms, to: vocabularyText)
+        if result.text != vocabularyText { vocabularyText = result.text; defaults.set(vocabularyText, forKey: "vocabulary") }
+        offeredPackTerms = result.offered
     }
 
     var vocabulary: Vocabulary { Vocabulary(text: vocabularyText) }
@@ -75,6 +89,7 @@ final class AppSettings: ObservableObject {
         guard after != before else { return }
         vocabularyText = VocabularyPack.apply(selected: after, previouslySelected: before, to: vocabularyText)
         dictionaryPacks = VocabularyPack.all.map(\.id).filter { after.contains($0) }
+        if on { offeredPackTerms.formUnion(VocabularyPack.all.filter { $0.id == id }.flatMap(\.terms).map { $0.lowercased() }) }
     }
     var cloudProvider: CloudProviderID { CloudProviderID(rawValue: cloudProviderID) ?? .openAI }
 
