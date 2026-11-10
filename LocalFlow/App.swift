@@ -154,6 +154,7 @@ final class WindowManager {
         windows[key] = window
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
             self?.windows[key] = nil
+            if key == "settings" { DictationController.shared.recorder.stopMonitoring() }  // don't leave the mic test running
             if self?.windows.isEmpty == true { NSApp.setActivationPolicy(.accessory) }
         }
         return window
