@@ -22,6 +22,7 @@ final class AudioRecorder: ObservableObject {
     /// A fresh engine per recording, dropped when it ends: a kept engine holds the mic open, which leaves Bluetooth
     /// headphones in low-quality headset mode, and its cached input format goes stale when the device changes (-10868).
     private var engine: AVAudioEngine?
+    private var configObserver: NSObjectProtocol?
     private var converter: AVAudioConverter?
     private var samples: [Float] = []
     private let lock = NSLock()
@@ -64,6 +65,7 @@ final class AudioRecorder: ObservableObject {
     private func startEngine() throws {
         let engine = AVAudioEngine()
         self.engine = engine
+        observeConfigurationChange(of: engine)
         let input = engine.inputNode
         selectDevice(on: input)
         let inputFormat = input.inputFormat(forBus: 0)
@@ -84,7 +86,31 @@ final class AudioRecorder: ObservableObject {
         try engine.start()
     }
 
+    /// The device changed under a running engine (unplugged, switched, or Bluetooth headphones flipping into headset
+    /// mode right after the mic opens): the engine has stopped, so start a new one and keep what was recorded so far.
+    private func observeConfigurationChange(of engine: AVAudioEngine) {
+        configObserver.map(NotificationCenter.default.removeObserver)
+        configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            guard let self, self.engine === engine else { return }
+            if isRecording {
+                releaseEngine()
+                if (try? startEngine()) == nil {
+                    releaseEngine()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                        guard let self, isRecording, self.engine == nil else { return }
+                        if (try? startEngine()) == nil { releaseEngine() }
+                    }
+                }
+            } else if monitoring {
+                pauseMonitoring()
+                resumeMonitoringIfWanted()
+            }
+        }
+    }
+
     private func releaseEngine() {
+        configObserver.map(NotificationCenter.default.removeObserver)
+        configObserver = nil
         guard let engine else { return }
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
@@ -100,10 +126,11 @@ final class AudioRecorder: ObservableObject {
         monitoring = true
         let engine = AVAudioEngine()
         self.engine = engine
+        observeConfigurationChange(of: engine)
         let input = engine.inputNode
         selectDevice(on: input)
         let format = input.inputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else { monitoring = false; self.engine = nil; return }
+        guard format.sampleRate > 0, format.channelCount > 0 else { monitoring = false; releaseEngine(); return }
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
             guard let self, let mono = Self.mixedToMono(buffer), let data = mono.floatChannelData, mono.frameLength > 0 else { return }
