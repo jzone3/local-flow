@@ -15,10 +15,14 @@ final class AudioRecorder: ObservableObject {
     @Published private(set) var monitorLevel: Float = 0
     private var gain = AutoGain()
     private var monitoring = false
-    private var resumeMonitoring = false
+    /// Settings' mic test is on screen; a dictation pauses the meter and it comes back after, only while this is true.
+    private var monitorWanted = false
     private var monitorCancellable: AnyCancellable?
 
-    private let engine = AVAudioEngine()
+    /// A fresh engine per recording, dropped when it ends: a kept engine holds the mic open, which leaves Bluetooth
+    /// headphones in low-quality headset mode, and its cached input format goes stale when the device changes (-10868).
+    private var engine: AVAudioEngine?
+    private var configObserver: NSObjectProtocol?
     private var converter: AVAudioConverter?
     private var samples: [Float] = []
     private let lock = NSLock()
@@ -44,9 +48,24 @@ final class AudioRecorder: ObservableObject {
     func start() throws {
         gain.reset()
         guard !isRecording else { return }
-        resumeMonitoring = monitoring
-        stopMonitoring()
+        pauseMonitoring()
         samples = []
+        do {
+            try startEngine()
+        } catch {
+            // Bluetooth headphones switch into headset mode when the mic opens, and the first start can fail mid-switch.
+            releaseEngine()
+            Thread.sleep(forTimeInterval: 0.3)
+            do { try startEngine() } catch { releaseEngine(); resumeMonitoringIfWanted(); throw error }
+        }
+        isRecording = true
+        startedAt = Date()
+    }
+
+    private func startEngine() throws {
+        let engine = AVAudioEngine()
+        self.engine = engine
+        observeConfigurationChange(of: engine)
         let input = engine.inputNode
         selectDevice(on: input)
         let inputFormat = input.inputFormat(forBus: 0)
@@ -65,19 +84,53 @@ final class AudioRecorder: ObservableObject {
         }
         engine.prepare()
         try engine.start()
-        isRecording = true
-        startedAt = Date()
+    }
+
+    /// The device changed under a running engine (unplugged, switched, or Bluetooth headphones flipping into headset
+    /// mode right after the mic opens): the engine has stopped, so start a new one and keep what was recorded so far.
+    private func observeConfigurationChange(of engine: AVAudioEngine) {
+        configObserver.map(NotificationCenter.default.removeObserver)
+        configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            guard let self, self.engine === engine else { return }
+            if isRecording {
+                releaseEngine()
+                if (try? startEngine()) == nil {
+                    releaseEngine()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                        guard let self, isRecording, self.engine == nil else { return }
+                        if (try? startEngine()) == nil { releaseEngine() }
+                    }
+                }
+            } else if monitoring {
+                pauseMonitoring()
+                resumeMonitoringIfWanted()
+            }
+        }
+    }
+
+    private func releaseEngine() {
+        configObserver.map(NotificationCenter.default.removeObserver)
+        configObserver = nil
+        guard let engine else { return }
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        engine.reset()
+        self.engine = nil
     }
 
     /// Settings mic test: runs the engine with a tap that only measures level. Stops itself when a real
     /// recording starts and restarts when the chosen device changes.
     func startMonitoring() {
+        monitorWanted = true
         guard !monitoring, !isRecording, Self.hasPermission else { return }
         monitoring = true
+        let engine = AVAudioEngine()
+        self.engine = engine
+        observeConfigurationChange(of: engine)
         let input = engine.inputNode
         selectDevice(on: input)
         let format = input.inputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else { monitoring = false; return }
+        guard format.sampleRate > 0, format.channelCount > 0 else { monitoring = false; releaseEngine(); return }
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
             guard let self, let mono = Self.mixedToMono(buffer), let data = mono.floatChannelData, mono.frameLength > 0 else { return }
@@ -90,17 +143,25 @@ final class AudioRecorder: ObservableObject {
         engine.prepare()
         try? engine.start()
         monitorCancellable = AppSettings.shared.$inputDeviceUID.dropFirst().removeDuplicates().sink { [weak self] _ in
-            DispatchQueue.main.async { self?.stopMonitoring(); self?.startMonitoring() }
+            DispatchQueue.main.async { self?.pauseMonitoring(); self?.resumeMonitoringIfWanted() }
         }
     }
 
     func stopMonitoring() {
+        monitorWanted = false
+        pauseMonitoring()
+    }
+
+    private func pauseMonitoring() {
         guard monitoring else { return }
         monitoring = false
         monitorCancellable = nil
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        releaseEngine()
         monitorLevel = 0
+    }
+
+    private func resumeMonitoringIfWanted() {
+        if monitorWanted { startMonitoring() }
     }
 
     /// Points the input node at the microphone chosen in Settings. With no choice (or an unplugged one) it goes
@@ -118,10 +179,9 @@ final class AudioRecorder: ObservableObject {
     /// Stops and returns the captured samples plus their duration in seconds.
     func stop() -> (samples: [Float], duration: Double) {
         guard isRecording else { return ([], 0) }
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
+        releaseEngine()
         isRecording = false
-        if resumeMonitoring { resumeMonitoring = false; DispatchQueue.main.async { self.startMonitoring() } }
+        DispatchQueue.main.async { self.resumeMonitoringIfWanted() }
         lock.lock(); let captured = samples; samples = []; lock.unlock()
         let duration = startedAt.map { Date().timeIntervalSince($0) } ?? Double(captured.count) / Self.sampleRate
         DispatchQueue.main.async { self.level = 0; self.levels = Array(repeating: 0, count: self.levels.count) }
