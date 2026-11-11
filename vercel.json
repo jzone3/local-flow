@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": { "deploymentEnabled": { "devin/task-27-safe-handoff": false } },
   "buildCommand": "",
   "outputDirectory": "site",
   "cleanUrls": true,

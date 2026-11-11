@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Safe Handoff · Local Flow Lab</title>
+  <style>
+    :root { color-scheme: light; --ink:#222b2a; --muted:#64716c; --line:#dce2dc; --green:#23634f; --soft:#edf4ed; --amber:#86561c; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:#f6f7f3; font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
+    button,input,textarea { font:inherit; }
+    button { cursor:pointer; border:1px solid var(--line); color:var(--ink); background:#fff; padding:9px 14px; border-radius:9px; font-weight:550; transition:background .15s,border-color .15s; }
+    button:hover:not(:disabled) { background:#f0f4ef; border-color:#99ab9f; }
+    button:disabled { cursor:not-allowed; opacity:.45; }
+    :focus-visible { outline:3px solid #679c86; outline-offset:3px; }
+    .primary { background:var(--green); color:white; border-color:var(--green); }
+    .primary:hover:not(:disabled) { background:#174b3b; }
+    .quiet { border-color:transparent; background:transparent; color:var(--muted); }
+    .small { font-size:12px; padding:6px 10px; }
+    svg { display:block; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+    .brand { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:650; letter-spacing:-.3px; }
+    .brand svg { width:29px; height:29px; }
+    .brand span { color:var(--muted); font-weight:400; border-left:1px solid #cdd5cb; padding-left:12px; margin-left:5px; }
+    header { max-width:1160px; margin:auto; padding:25px 36px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); gap:12px; }
+    .badge { font-size:10px; letter-spacing:1.1px; font-weight:650; text-transform:uppercase; border:1px solid #d9cdbb; background:#f6f0e6; color:#775a34; padding:5px 9px; border-radius:5px; white-space:nowrap; }
+    main { max-width:1160px; margin:auto; padding:35px 36px 24px; }
+    .intro { display:flex; gap:25px; align-items:flex-end; justify-content:space-between; margin-bottom:26px; }
+    .eyebrow { color:var(--green); font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin:0 0 10px; }
+    h1 { font-size:clamp(29px,3.4vw,40px); line-height:1.15; letter-spacing:-1.6px; font-weight:600; margin:0 0 12px; }
+    .lede { color:var(--muted); font-size:15px; margin:0; max-width:570px; }
+    .mode { flex-shrink:0; display:flex; padding:4px; gap:3px; background:#e9ede7; border:1px solid #dce2d8; border-radius:11px; }
+    .mode button { background:transparent; border:1px solid transparent; font-size:12px; padding:8px 12px; color:#5d675f; }
+    .mode button[aria-pressed="true"] { background:white; border-color:#d5ded2; box-shadow:0 1px 3px #23372812; color:var(--green); }
+    .lab { display:grid; grid-template-columns:246px minmax(0,1fr); border:1px solid #d5ddd3; border-radius:16px; background:white; overflow:hidden; box-shadow:0 10px 30px #28352d06; }
+    aside { background:#fafbf8; border-right:1px solid var(--line); padding:25px 22px; }
+    aside h2 { font-size:16px; letter-spacing:-.3px; margin:0 0 20px; font-weight:600; }
+    .steps { list-style:none; padding:0; margin:0 0 25px; counter-reset:steps; }
+    .steps li { position:relative; padding:0 0 20px 31px; color:#6b756d; font-size:12px; }
+    .steps li:before { counter-increment:steps; content:counter(steps); position:absolute; left:0; top:0; border:1px solid #d2ddcf; width:21px; height:21px; border-radius:50%; display:grid; place-items:center; color:var(--green); background:#f0f5ed; font-size:10px; }
+    .steps strong { display:block; color:var(--ink); font-weight:550; font-size:13px; margin-bottom:3px; }
+    .sample-label { font-size:11px; color:var(--muted); display:block; margin-bottom:7px; }
+    #sample { width:100%; resize:vertical; min-height:100px; border:1px solid #d8dfd3; background:#fff; padding:12px; border-radius:8px; font-size:12px; line-height:1.6; color:#4c594f; }
+    #start { width:100%; margin-top:11px; }
+    .local-note { font-size:11px; color:var(--muted); margin:11px 0 0; }
+    .workspace { min-width:0; padding:21px 23px 0; background:linear-gradient(145deg,#eef2eb,#f3f5f0 60%,#e6eee7); }
+    .workspace-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:8px; }
+    .workspace-head p { margin:0; color:#637164; font-size:10px; letter-spacing:1.1px; text-transform:uppercase; font-weight:650; }
+    .workspace-head span { color:var(--muted); font-size:11px; }
+    .windows { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+    .window { background:#fff; border:1px solid #d7dfd3; border-radius:11px; box-shadow:0 7px 14px #29412d06; overflow:hidden; min-width:0; transition:box-shadow .15s; }
+    .window.active { border-color:#64957e; box-shadow:0 0 0 2px #64957e22,0 7px 14px #29412d08; }
+    .window-bar { padding:11px 12px; display:flex; align-items:center; justify-content:space-between; background:#fafbf9; border-bottom:1px solid #edf0e9; font-size:11px; color:#627064; gap:6px; }
+    .window-bar strong { font-weight:550; }
+    .dots { display:flex; gap:4px; }
+    .dots i { width:6px; height:6px; border-radius:50%; background:#d8ded3; }
+    .window.active .dots i:first-child { background:#95b5a0; }
+    .document { padding:17px 15px 15px; }
+    .document h3 { margin:0 0 4px; font-size:16px; letter-spacing:-.4px; font-weight:600; }
+    .document p { font-size:11px; color:#7b8279; margin:0 0 16px; }
+    .field-label { display:flex; align-items:center; justify-content:space-between; font-size:10px; color:var(--muted); margin-bottom:7px; }
+    .active-label { color:var(--green); font-size:9px; text-transform:uppercase; letter-spacing:.5px; }
+    .target { display:block; width:100%; height:136px; border:1px solid #e3e8de; border-radius:7px; resize:vertical; padding:12px; line-height:1.7; background:#fcfdfa; color:#435345; font-size:12px; }
+    .target:focus { outline:2px solid #83a993; outline-offset:1px; }
+    .target::placeholder { color:#7e887f; }
+    .chat-title { display:flex; gap:9px; align-items:center; }
+    .avatar { border-radius:7px; background:#e8eee4; color:#59705c; width:30px; height:30px; display:grid; place-items:center; font-size:12px; }
+    .route { margin:20px 0 0; padding:13px 1px; border-top:1px solid #d4ddd0; display:flex; gap:12px; align-items:center; }
+    .route-cell { flex:1; min-width:0; }
+    .route-cell span { font-size:9px; letter-spacing:1px; color:#75806e; display:block; margin-bottom:3px; text-transform:uppercase; }
+    .route-cell strong { font-size:12px; font-weight:550; }
+    .route-arrow { color:#96a18f; font-size:18px; }
+    .result { grid-column:1/-1; border-top:1px solid var(--line); padding:19px 23px; background:#fff; }
+    .status-row { display:flex; gap:13px; align-items:center; }
+    .status-symbol { flex-shrink:0; width:36px; height:36px; border-radius:10px; display:grid; place-items:center; background:#edf3eb; color:var(--green); }
+    .status-symbol svg { width:21px; height:21px; }
+    .status-copy { flex:1; }
+    .status-copy h2 { margin:0 0 3px; font-size:14px; font-weight:600; }
+    .status-copy p { margin:0; color:var(--muted); font-size:12px; }
+    .result[data-state="held"] { background:#fdfaf3; border-top-color:#e6d8bb; }
+    .result[data-state="held"] .status-symbol { color:var(--amber); background:#f5ead4; }
+    .result[data-state="held"] h2 { color:#704a1c; }
+    .result[data-state="misplaced"] { background:#fff6f1; }
+    .pending { margin:16px 0 0 49px; }
+    .pending textarea { width:100%; resize:vertical; min-height:60px; padding:10px 12px; color:#4a4d41; background:#fffefa; border:1px solid #e4dac6; border-radius:7px; font-size:13px; }
+    .actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    #confirm-hint { margin:9px 0 0; font-size:11px; color:#806e52; }
+    #clipboard-status { margin:7px 0 0; font-size:12px; }
+    .busy-actions { display:flex; gap:8px; align-items:center; }
+    .wave { display:flex; height:18px; align-items:center; gap:3px; }
+    .wave i { width:3px; background:#42765e; height:10px; border-radius:4px; animation:pulse 1s ease-in-out infinite alternate; }
+    .wave i:nth-child(2n) { height:17px; animation-delay:-.6s; }
+    .wave i:nth-child(3n) { height:5px; animation-delay:-.3s; }
+    @keyframes pulse { to { transform:scaleY(.45); } }
+    .foot { display:flex; justify-content:space-between; gap:20px; padding:17px 2px; font-size:11px; color:var(--muted); }
+    .foot p { margin:0; }
+    details { border-top:1px solid var(--line); padding:14px 0; color:var(--muted); font-size:12px; }
+    summary { cursor:pointer; color:#445b4a; font-weight:550; }
+    .scope { display:grid; grid-template-columns:1fr 1fr; gap:30px; margin-top:13px; max-width:880px; }
+    .scope p { margin:0; }
+    .scope strong { display:block; color:var(--ink); margin-bottom:5px; }
+    [hidden] { display:none !important; }
+    @media(max-width:900px) { .intro { align-items:flex-start; flex-direction:column; gap:18px; } .lab { grid-template-columns:210px minmax(0,1fr); } aside { padding:21px 16px; } .workspace { padding:21px 16px 0; } .windows { gap:10px; } .document { padding:14px 10px; } }
+    @media(max-width:640px) { header { padding:20px; } main { padding:25px 20px; } .brand span { display:none; } .lab { display:block; } aside { border-right:none; border-bottom:1px solid var(--line); } .steps { display:flex; gap:10px; margin-bottom:10px; } .steps li { flex:1; padding-left:0; padding-top:28px; } #sample { min-height:65px; } .windows { grid-template-columns:1fr; } .target { height:100px; } .workspace-head { flex-wrap:wrap; } .status-row { flex-wrap:wrap; } .busy-actions { margin-left:49px; } .pending { margin-left:0; } .scope { grid-template-columns:1fr; gap:15px; } .foot { flex-direction:column; gap:5px; } }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="9"/><path d="M9 14v4m5-9v14m5-11v8m5-6v4"/></svg>Local Flow <span>Lab</span></div>
+    <span class="badge">Browser simulation</span>
+  </header>
+  <main>
+    <section class="intro" aria-labelledby="title">
+      <div><p class="eyebrow">01 / Safe Handoff</p><h1>Your words. The right place.</h1><p class="lede">Switch windows while a transcript finishes? Keep it out of the wrong conversation. Nothing new to do when you stay put.</p></div>
+      <div class="mode" role="group" aria-label="Handoff behavior">
+        <button id="safe" aria-pressed="true">Safe Handoff</button><button id="baseline" aria-pressed="false">Without guard</button>
+      </div>
+    </section>
+    <div class="lab">
+      <aside>
+        <h2>Try an interruption.</h2>
+        <ol class="steps"><li><strong>Start in Notes</strong>Use the sample below, or write your own.</li><li><strong>Click Team chat</strong>While the sample is “transcribing.”</li><li><strong>See where it lands</strong>Then compare without the guard.</li></ol>
+        <label for="sample" class="sample-label">Sample transcript · editable, not recorded</label>
+        <textarea id="sample" maxlength="2000" spellcheck="false">The acquisition is still confidential. Keep this between us until Friday.</textarea>
+        <button class="primary" id="start">Start sample in Notes</button>
+        <p class="local-note">No mic. No model. No network calls.<br>Only the two fields here are affected.</p>
+      </aside>
+      <section class="workspace" aria-label="Simulated workspace">
+        <div class="workspace-head"><p>Two stand-in apps</p><span>Click a field to change the destination</span></div>
+        <div class="windows">
+          <section class="window active" id="notes-window" aria-labelledby="notes-title">
+            <div class="window-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><strong>Notes</strong><span>Private</span></div>
+            <div class="document"><h3 id="notes-title">A thought for later</h3><p>Just for you · on this page</p><label class="field-label" for="notes">Note body <span class="active-label" id="notes-active">Selected</span></label><textarea class="target" id="notes" spellcheck="false" placeholder="Your private note starts here…"></textarea></div>
+          </section>
+          <section class="window" id="chat-window" aria-labelledby="chat-title">
+            <div class="window-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><strong>Team chat</strong><span>Shared</span></div>
+            <div class="document"><div class="chat-title"><div class="avatar" aria-hidden="true">#</div><h3 id="chat-title">team-updates</h3></div><p>A simulated shared conversation</p><label class="field-label" for="chat">Message draft <span class="active-label" id="chat-active" hidden>Selected</span></label><textarea class="target" id="chat" spellcheck="false" placeholder="Click here while the sample finishes…"></textarea></div>
+          </section>
+        </div>
+        <div class="route" aria-label="Destination comparison"><div class="route-cell"><span>Started in</span><strong id="origin">—</strong></div><span class="route-arrow" aria-hidden="true">→</span><div class="route-cell"><span>Selected now</span><strong id="current">Notes</strong></div><span class="route-arrow" aria-hidden="true">→</span><div class="route-cell"><span>Handoff</span><strong id="decision">Ready</strong></div></div>
+      </section>
+      <section class="result" id="result" data-state="ready" aria-label="Handoff result">
+        <div class="status-row">
+          <div class="status-symbol" aria-hidden="true"><svg id="shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5c0 4.5 3.4 7.9 7.5 10 4.1-2.1 7.5-5.5 7.5-10V6L12 3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg><div class="wave" id="wave" hidden><i></i><i></i><i></i><i></i><i></i></div></div>
+          <div class="status-copy" role="status" aria-live="polite" aria-atomic="true"><h2 id="status-title">A quiet safety net.</h2><p id="status-text">Start a sample, then click Team chat before it finishes.</p></div>
+          <div id="busy" class="busy-actions" hidden><button id="finish" class="small">Finish now</button><button id="cancel" class="small quiet">Cancel</button></div>
+          <button id="reset" class="quiet small">Reset demo</button>
+        </div>
+        <div class="pending" id="pending" hidden>
+          <label for="held-text" class="sample-label">Held on this page · not inserted anywhere</label><textarea id="held-text" readonly></textarea>
+          <div class="actions"><button id="confirm" class="primary" disabled>Insert into Notes</button><button id="copy">Copy transcript</button><button id="discard" class="quiet">Discard</button></div>
+          <p id="confirm-hint">Click Notes to choose the insertion point, then confirm. Returning alone won’t paste.</p><p id="clipboard-status" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+    </div>
+    <div class="foot"><p>One guard. No new workflow when your destination stays the same.</p><p>Session-only demo · reload clears all text</p></div>
+    <details><summary>What is real, and what is simulated?</summary><div class="scope"><p><strong>Real in this prototype</strong>Editable fields, destination and caret checks, holding a result, explicit insertion, discard, cancellation, and clipboard copy on request. No storage, analytics, microphone, or external requests. Copying intentionally moves text to your system clipboard; reload cannot clear that copy.</p><p><strong>Simulated, not native verification</strong>Both apps, transcription, and the five-second delay. “Without guard” models the current insertion policy from source, not a recorded macOS reproduction. The prototype cannot inspect or paste into other apps; a native version would still need Accessibility identity and paste-race testing.</p></div></details>
+  </main>
+  <script id="handoff-model">
+    const Handoff = (() => {
+      const usable = target => Boolean(target && target.known && target.editable);
+      const same = (a, b) => usable(a) && usable(b) && a.id === b.id && a.value === b.value && a.start === b.start && a.end === b.end;
+      function begin(token, text, origin, mode = 'safe') {
+        return { token, text, origin: { ...origin }, mode, status: 'transcribing', interrupted: false, destination: null };
+      }
+      function observe(session, target) {
+        if (!session || session.status !== 'transcribing' || same(session.origin, target)) return session;
+        return { ...session, interrupted: true };
+      }
+      function finish(session, token, target) {
+        if (!session || session.token !== token || session.status !== 'transcribing') return session;
+        const allowed = usable(target) && (session.mode === 'baseline' || (!session.interrupted && same(session.origin, target)));
+        return { ...session, status: allowed ? 'inserted' : 'held', destination: allowed ? { ...target } : null };
+      }
+      function confirm(session, target) {
+        if (!session || session.status !== 'held' || !usable(target) || target.id !== session.origin.id) return session;
+        return { ...session, status: 'inserted', destination: { ...target } };
+      }
+      function discard(session, status = 'discarded') {
+        return session ? { ...session, text: '', status, destination: null } : session;
+      }
+      function insert(target, text) {
+        return target.value.slice(0, target.start) + text + target.value.slice(target.end);
+      }
+      return { begin, observe, finish, confirm, discard, insert, usable };
+    })();
+  </script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const names = { notes: 'Notes', chat: 'Team chat' };
+    let mode = 'safe', session = null, selected = 'notes', sequence = 0, timer, pageActive = true;
+    let ranges = { notes: [0, 0], chat: [0, 0] };
+    function target() {
+      const field = $(selected), [start, end] = ranges[selected];
+      return { id: selected, value: field.value, start, end, known: pageActive && !document.hidden, editable: !field.disabled && !field.readOnly };
+    }
+    function observe() { session = Handoff.observe(session, target()); render(); }
+    for (const id of ['notes', 'chat']) {
+      const field = $(id);
+      for (const event of ['focus', 'input', 'select', 'keyup', 'click']) field.addEventListener(event, () => {
+        selected = id; ranges[id] = [field.selectionStart, field.selectionEnd]; observe();
+      });
+    }
+    window.addEventListener('blur', () => { pageActive = false; observe(); });
+    window.addEventListener('focus', () => { pageActive = true; observe(); });
+    document.addEventListener('visibilitychange', observe);
+    function applyInsertion(previous) {
+      if (session === previous || session.status !== 'inserted') return;
+      const destination = session.destination, field = $(destination.id);
+      field.value = Handoff.insert(destination, session.text);
+      const caret = destination.start + session.text.length;
+      ranges[destination.id] = [caret, caret];
+      field.setSelectionRange(caret, caret);
+    }
+    function finish(token) {
+      const previous = session;
+      session = Handoff.finish(session, token, target());
+      applyInsertion(previous); render();
+    }
+    function clearTimer() { window.clearTimeout(timer); timer = undefined; }
+    $('start').addEventListener('click', () => {
+      if (!['held', 'transcribing'].includes(session?.status) && $('sample').value.trim()) {
+        clearTimer(); selected = 'notes'; $('notes').focus();
+        ranges.notes = [$('notes').selectionStart, $('notes').selectionEnd];
+        session = Handoff.begin(++sequence, $('sample').value, target(), mode);
+        $('clipboard-status').textContent = '';
+        const token = session.token;
+        timer = window.setTimeout(() => finish(token), 5000); render();
+      }
+    });
+    $('finish').addEventListener('click', () => { clearTimer(); finish(session?.token); });
+    $('cancel').addEventListener('click', () => { clearTimer(); session = Handoff.discard(session, 'cancelled'); render(); $('start').focus(); });
+    $('discard').addEventListener('click', () => { session = Handoff.discard(session); render(); $('start').focus(); });
+    $('confirm').addEventListener('click', () => { const previous = session; session = Handoff.confirm(session, target()); applyInsertion(previous); render(); if (session.status === 'inserted') $('notes').focus(); });
+    $('copy').addEventListener('click', async () => {
+      if (session?.status !== 'held') return;
+      const token = session.token;
+      try {
+        await navigator.clipboard.writeText(session.text);
+        if (session?.token === token && session.status === 'held') $('clipboard-status').textContent = 'Copied to your system clipboard. The held result is still here.';
+      } catch {
+        if (session?.token === token && session.status === 'held') { $('held-text').focus(); $('held-text').select(); $('clipboard-status').textContent = 'Clipboard unavailable here. The transcript is selected; use your copy shortcut.'; }
+      }
+    });
+    function reset() {
+      clearTimer(); ++sequence; session = null; selected = 'notes';
+      $('notes').value = ''; $('chat').value = ''; ranges = { notes: [0, 0], chat: [0, 0] };
+      $('clipboard-status').textContent = ''; render();
+    }
+    $('reset').addEventListener('click', reset);
+    for (const value of ['safe', 'baseline']) $(value).addEventListener('click', () => { mode = value; reset(); });
+    $('sample').addEventListener('input', render);
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && session?.status === 'transcribing') { event.preventDefault(); $('cancel').click(); }
+    });
+    function render() {
+      const status = session?.status || 'ready';
+      const busy = status === 'transcribing', held = status === 'held';
+      const misplaced = status === 'inserted' && session.destination.id !== session.origin.id;
+      $('safe').setAttribute('aria-pressed', String(mode === 'safe'));
+      $('baseline').setAttribute('aria-pressed', String(mode === 'baseline'));
+      $('safe').disabled = busy || held; $('baseline').disabled = busy || held;
+      $('start').disabled = busy || held || !$('sample').value.trim();
+      $('sample').disabled = busy || held;
+      $('busy').hidden = !busy; $('pending').hidden = !held;
+      $('wave').hidden = !busy; $('shield').hidden = busy;
+      $('held-text').value = held ? session.text : '';
+      $('result').dataset.state = misplaced ? 'misplaced' : status;
+      $('confirm').disabled = !held || selected !== session.origin.id || !Handoff.usable(target());
+      for (const id of ['notes', 'chat']) { $(id + '-window').classList.toggle('active', id === selected); $(id + '-active').hidden = id !== selected; }
+      $('origin').textContent = session ? names[session.origin.id] : '—';
+      $('current').textContent = pageActive && !document.hidden ? names[selected] : 'Not verified';
+      const copy = {
+        ready: ['A quiet safety net.', 'Start a sample, then click Team chat before it finishes.', 'Ready'],
+        transcribing: ['Transcribing the sample…', 'Simulated five-second delay. Click Team chat now, or stay in Notes.', 'Checking destination'],
+        held: ['Destination changed. Words held.', 'Nothing was inserted. Your sample is waiting for an explicit handoff.', 'Held · nothing pasted'],
+        inserted: misplaced ? ['That landed in Team chat.', 'Without the guard, the sample follows the current field. Reset and try Safe Handoff.', 'Wrong destination'] : ['Inserted into Notes.', 'Your words landed at the chosen insertion point. Team chat was left alone.', 'Delivered to Notes'],
+        cancelled: ['Cancelled. Nothing inserted.', 'The pending sample was cleared. You can start again.', 'Cancelled'],
+        discarded: ['Discarded. Nothing inserted.', 'The held result was cleared. Any explicit clipboard copy is yours to clear.', 'Discarded']
+      }[status];
+      $('status-title').textContent = copy[0]; $('status-text').textContent = copy[1]; $('decision').textContent = copy[2];
+    }
+    render();
+  </script>
+</body>
+</html>
