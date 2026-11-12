@@ -55,11 +55,18 @@ final class DictationController: ObservableObject {
     }
 
     func start() {
-        hotkey.onPress = { [weak self] in self?.hotkeyPressed() }
-        hotkey.onRelease = { [weak self] in self?.hotkeyReleased() }
-        hotkey.onCancel = { [weak self] in self?.cancel() }
-        hotkey.onChord = { [weak self] in self?.hotkeyChorded() }
+        // Off the event tap's callback: starting the mic can stall in CoreAudio, and a tap that does not return
+        // promptly is disabled by the system, which took the hotkey and the menu bar item with it.
+        hotkey.onPress = { [weak self] in DispatchQueue.main.async { self?.hotkeyPressed() } }
+        hotkey.onRelease = { [weak self] in DispatchQueue.main.async { self?.hotkeyReleased() } }
+        hotkey.onCancel = { [weak self] in DispatchQueue.main.async { self?.cancel() } }
+        hotkey.onChord = { [weak self] in DispatchQueue.main.async { self?.hotkeyChorded() } }
         hotkey.start()
+        recorder.onLost = { [weak self] in
+            guard let self, state == .listening else { return }
+            _ = recorder.stop()
+            show(failure: "The microphone stopped responding. Try again.")
+        }
         settings.$hotkey.dropFirst().sink { [weak self] key in self?.hotkey.update(hotkey: key) }.store(in: &cancellables)
         bar.attach(recorder: recorder, controller: self)
         LocalWhisper.shared.onModelLoading = { [weak self] loading in

@@ -23,6 +23,8 @@ final class AudioRecorder: ObservableObject {
     /// headphones in low-quality headset mode, and its cached input format goes stale when the device changes (-10868).
     private var engine: AVAudioEngine?
     private var configObserver: NSObjectProtocol?
+    /// Called on the main queue when a recording's engine stopped and could not be restarted.
+    var onLost: (() -> Void)?
     /// Puts the current mode's tap (recording or the Settings meter) on an input node, for the first start and
     /// for restarts after the device's format changed.
     private var tapInstaller: ((AVAudioInputNode) throws -> Void)?
@@ -123,7 +125,9 @@ final class AudioRecorder: ObservableObject {
     }
 
     private func restartEngine() {
-        guard let engine, isRecording || monitoring, let tapInstaller, restarts < Self.maxRestarts else { return }
+        guard let engine, isRecording || monitoring, let tapInstaller else { return }
+        if engine.isRunning { return }  // it survived the change; the tap is still delivering
+        guard restarts < Self.maxRestarts else { lost(); return }
         restarts += 1
         engine.inputNode.removeTap(onBus: 0)
         do {
@@ -132,7 +136,14 @@ final class AudioRecorder: ObservableObject {
             try engine.start()
         } catch {
             engine.inputNode.removeTap(onBus: 0)
+            lost()
         }
+    }
+
+    /// The mic could not be brought back during a recording: tell the controller so the bar says so instead of
+    /// listening to nothing. Monitoring just stops; the Settings meter sits at zero.
+    private func lost() {
+        if isRecording { onLost?() } else { pauseMonitoring() }
     }
 
     private func releaseEngine() {
@@ -199,11 +210,11 @@ final class AudioRecorder: ObservableObject {
 
     /// Points the input node at the microphone chosen in Settings. With no choice (or an unplugged one) it goes
     /// back to the system default explicitly: the input unit otherwise keeps whatever device was set last.
+    /// Only a microphone picked in Settings is set on the unit. With none picked a fresh engine is already on the
+    /// system default, and setting a device on it makes AVAudioEngine post a configuration change right after start.
     private func selectDevice(on input: AVAudioInputNode) {
-        guard let unit = input.audioUnit else { return }
-        let devices = AudioInputDevice.all
-        let picked = AppSettings.shared.inputDeviceUID.flatMap { uid in devices.first { $0.uid == uid } }
-        guard let device = picked ?? AudioInputDevice.systemDefault else { return }
+        guard let unit = input.audioUnit, let uid = AppSettings.shared.inputDeviceUID,
+              let device = AudioInputDevice.all.first(where: { $0.uid == uid }) else { return }
         var id = device.id
         AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
                              &id, UInt32(MemoryLayout<AudioDeviceID>.size))
