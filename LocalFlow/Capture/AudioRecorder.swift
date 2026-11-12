@@ -23,6 +23,13 @@ final class AudioRecorder: ObservableObject {
     /// headphones in low-quality headset mode, and its cached input format goes stale when the device changes (-10868).
     private var engine: AVAudioEngine?
     private var configObserver: NSObjectProtocol?
+    /// Puts the current mode's tap (recording or the Settings meter) on an input node, for the first start and
+    /// for restarts after the device's format changed.
+    private var tapInstaller: ((AVAudioInputNode) throws -> Void)?
+    private var restartWork: DispatchWorkItem?
+    private var restarts = 0
+    private static let maxRestarts = 3
+    private static let restartDelay: TimeInterval = 0.25
     private var converter: AVAudioConverter?
     private var samples: [Float] = []
     private let lock = NSLock()
@@ -63,15 +70,14 @@ final class AudioRecorder: ObservableObject {
     }
 
     private func startEngine() throws {
-        let engine = AVAudioEngine()
-        self.engine = engine
-        observeConfigurationChange(of: engine)
-        let input = engine.inputNode
-        selectDevice(on: input)
+        try makeEngine { [weak self] input in try self?.installRecordingTap(on: input) }
+    }
+
+    private static let noMicrophone = NSError(domain: "LocalFlow.Audio", code: 1, userInfo: [NSLocalizedDescriptionKey: "No microphone is available."])
+
+    private func installRecordingTap(on input: AVAudioInputNode) throws {
         let inputFormat = input.inputFormat(forBus: 0)
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            throw NSError(domain: "LocalFlow.Audio", code: 1, userInfo: [NSLocalizedDescriptionKey: "No microphone is available."])
-        }
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else { throw Self.noMicrophone }
         let outputFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Self.sampleRate, channels: 1, interleaved: false)!
         // Mix every input channel down to mono ourselves (the converter would only keep channel 0, so a mic
         // on input 2 of an interface or a multi-channel virtual device would record silence).
@@ -82,33 +88,57 @@ final class AudioRecorder: ObservableObject {
             guard let self, let mono = Self.mixedToMono(buffer, format: monoFormat) else { return }
             self.consume(mono, outputFormat: outputFormat)
         }
+    }
+
+    /// A new engine on the chosen device with `tap` on its input, started. The device is picked once, here: doing
+    /// it again on every restart is what made 0.0.23 loop (see `observeConfigurationChange`).
+    private func makeEngine(tap: @escaping (AVAudioInputNode) throws -> Void) throws {
+        let engine = AVAudioEngine()
+        self.engine = engine
+        tapInstaller = tap
+        restarts = 0
+        observeConfigurationChange(of: engine)
+        let input = engine.inputNode
+        selectDevice(on: input)
+        try tap(input)
         engine.prepare()
         try engine.start()
     }
 
     /// The device changed under a running engine (unplugged, switched, or Bluetooth headphones flipping into headset
-    /// mode right after the mic opens): the engine has stopped, so start a new one and keep what was recorded so far.
+    /// mode right after the mic opens): the engine has stopped, so bring it back and keep what was recorded so far.
+    /// CoreAudio can post this several times in a row, and opening the mic is itself what changes some devices'
+    /// format, so a notification does not rebuild the engine (that re-opened the mic, which posted another one:
+    /// 0.0.23 spun on the main thread, the mic indicator flashed and the menu bar froze). The same engine restarts
+    /// in place with the new format, one restart per burst, and after a few in one session it stays stopped.
     private func observeConfigurationChange(of engine: AVAudioEngine) {
         configObserver.map(NotificationCenter.default.removeObserver)
         configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
             guard let self, self.engine === engine else { return }
-            if isRecording {
-                releaseEngine()
-                if (try? startEngine()) == nil {
-                    releaseEngine()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                        guard let self, isRecording, self.engine == nil else { return }
-                        if (try? startEngine()) == nil { releaseEngine() }
-                    }
-                }
-            } else if monitoring {
-                pauseMonitoring()
-                resumeMonitoringIfWanted()
-            }
+            restartWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.restartEngine() }
+            restartWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.restartDelay, execute: work)
+        }
+    }
+
+    private func restartEngine() {
+        guard let engine, isRecording || monitoring, let tapInstaller, restarts < Self.maxRestarts else { return }
+        restarts += 1
+        engine.inputNode.removeTap(onBus: 0)
+        do {
+            try tapInstaller(engine.inputNode)
+            engine.prepare()
+            try engine.start()
+        } catch {
+            engine.inputNode.removeTap(onBus: 0)
         }
     }
 
     private func releaseEngine() {
+        restartWork?.cancel()
+        restartWork = nil
+        tapInstaller = nil
         configObserver.map(NotificationCenter.default.removeObserver)
         configObserver = nil
         guard let engine else { return }
@@ -124,13 +154,21 @@ final class AudioRecorder: ObservableObject {
         monitorWanted = true
         guard !monitoring, !isRecording, Self.hasPermission else { return }
         monitoring = true
-        let engine = AVAudioEngine()
-        self.engine = engine
-        observeConfigurationChange(of: engine)
-        let input = engine.inputNode
-        selectDevice(on: input)
+        do {
+            try makeEngine { [weak self] input in try self?.installMonitorTap(on: input) }
+        } catch {
+            monitoring = false
+            releaseEngine()
+            return
+        }
+        monitorCancellable = AppSettings.shared.$inputDeviceUID.dropFirst().removeDuplicates().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.pauseMonitoring(); self?.resumeMonitoringIfWanted() }
+        }
+    }
+
+    private func installMonitorTap(on input: AVAudioInputNode) throws {
         let format = input.inputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else { monitoring = false; releaseEngine(); return }
+        guard format.sampleRate > 0, format.channelCount > 0 else { throw Self.noMicrophone }
         input.removeTap(onBus: 0)
         input.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
             guard let self, let mono = Self.mixedToMono(buffer), let data = mono.floatChannelData, mono.frameLength > 0 else { return }
@@ -139,11 +177,6 @@ final class AudioRecorder: ObservableObject {
             // The Settings meter is a true reading on a fixed scale (−60…−10 dB), unlike the bar's auto-gained waveform.
             let normalized = min(1, max(0, (20 * log10(max(rms, 1e-6)) + 60) / 50))
             DispatchQueue.main.async { self.monitorLevel = self.monitorLevel * 0.5 + normalized * 0.5 }
-        }
-        engine.prepare()
-        try? engine.start()
-        monitorCancellable = AppSettings.shared.$inputDeviceUID.dropFirst().removeDuplicates().sink { [weak self] _ in
-            DispatchQueue.main.async { self?.pauseMonitoring(); self?.resumeMonitoringIfWanted() }
         }
     }
 
