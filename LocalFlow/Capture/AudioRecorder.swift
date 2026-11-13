@@ -144,19 +144,10 @@ final class AudioRecorder: ObservableObject {
         configObserver.map(NotificationCenter.default.removeObserver)
         configObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
             guard let self, self.engine === engine else { return }
-            if isRecording {
-                releaseEngine()
-                if (try? startEngine()) == nil {
-                    releaseEngine()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                        guard let self, isRecording, self.engine == nil else { return }
-                        if (try? startEngine()) == nil { releaseEngine() }
-                    }
-                }
-            } else if monitoring {
-                pauseMonitoring()
-                resumeMonitoringIfWanted()
-            }
+            restartWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.restartEngine() }
+            restartWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.restartDelay, execute: work)
         }
     }
 
