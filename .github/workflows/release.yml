@@ -65,6 +65,12 @@ jobs:
           echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
           echo "Version $VERSION (publish=$PUBLISH)"
 
+      # Nothing is signed or published unless a recording survives device changes (0.0.23 shipped without this).
+      - name: Tests
+        run: |
+          scripts/test-core.sh
+          scripts/test-recorder.sh
+
       - name: Import Developer ID certificate
         env:
           MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
