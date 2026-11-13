@@ -25,3 +25,4 @@ jobs:
           -configuration Debug -derivedDataPath build
           CODE_SIGNING_ALLOWED=NO build | tail -20
       - run: scripts/test-core.sh
+      - run: scripts/test-recorder.sh

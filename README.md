@@ -47,7 +47,7 @@ xcodebuild -project LocalFlow.xcodeproj -scheme LocalFlow -configuration Debug -
 open "build/Build/Products/Debug/Local Flow.app"
 ```
 
-Tests for the pure-Swift core (cleanup rules, dictionary spelling fixes, env-key scan, version compare) run with `scripts/test-core.sh`.
+Tests for the pure-Swift core (cleanup rules, dictionary spelling fixes, env-key scan, version compare) run with `scripts/test-core.sh`. `scripts/test-recorder.sh` runs the recorder through microphone format changes on scripted engines (no microphone needed); both run in CI and before a release is built.
 
 ## Layout
 
