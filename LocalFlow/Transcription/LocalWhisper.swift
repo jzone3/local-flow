@@ -210,6 +210,8 @@ final class ModelDownloader: NSObject, ObservableObject, URLSessionDownloadDeleg
                                 totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard let id = downloadTask.taskDescription else { return }
         Task { @MainActor in
+            // A progress callback already in flight when Cancel is clicked must not bring the row back to "downloading".
+            guard self.tasks[id] != nil else { return }
             let expected = totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : WhisperModel.named(id).bytes
             self.progress[id] = Double(totalBytesWritten) / Double(max(expected, 1))
         }
