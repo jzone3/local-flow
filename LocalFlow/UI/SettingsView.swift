@@ -340,7 +340,6 @@ struct ModelList: View {
                         HStack(spacing: 8) {
                             Text(model.title).fontWeight(.semibold).fixedSize(horizontal: !model.isCustom, vertical: true)
                             Text(model.isCustom ? model.sizeText : "\(model.sizeText) · \(model.shortName)").font(.caption).foregroundStyle(.secondary)
-                                .lineLimit(1).truncationMode(.middle)
                             if model == WhisperModel.recommended {
                                 Text("Recommended").font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor).fixedSize()
                                     .padding(.horizontal, 6).padding(.vertical, 2)
