@@ -229,7 +229,7 @@ struct ProviderKeyRow: View {
                 Spacer()
                 if hasKey, !editing {
                     if showsRemove {
-                        Button("Remove") { Keychain.delete(provider.keychainAccount); onChange() }.actionButton().controlSize(.small)
+                        Button("Remove") { Keychain.delete(provider.keychainAccount); onChange() }.actionButton().controlSize(.small).fixedSize()
                     }
                     Button("Replace") { editing = true }.actionButton().controlSize(.small)
                 } else if !hasKey, let found {
@@ -338,10 +338,10 @@ struct ModelList: View {
                     Radio(on: selected)
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 8) {
-                            Text(model.title).fontWeight(.semibold)
+                            Text(model.title).fontWeight(.semibold).fixedSize(horizontal: !model.isCustom, vertical: true)
                             Text(model.isCustom ? model.sizeText : "\(model.sizeText) · \(model.shortName)").font(.caption).foregroundStyle(.secondary)
                             if model == WhisperModel.recommended {
-                                Text("Recommended").font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor)
+                                Text("Recommended").font(.caption2.weight(.medium)).foregroundStyle(Color.accentColor).fixedSize()
                                     .padding(.horizontal, 6).padding(.vertical, 2)
                                     .background(Color.accentColor.opacity(0.12), in: Capsule())
                             }
@@ -351,6 +351,7 @@ struct ModelList: View {
                             Text(error).font(.caption).foregroundStyle(.red)
                         }
                     }
+                    .layoutPriority(1)
                     Spacer(minLength: 8)
                     trailing(model)
                 }
@@ -382,18 +383,18 @@ struct ModelList: View {
     @ViewBuilder
     private func trailing(_ model: WhisperModel) -> some View {
         if let progress = downloader.progress[model.id] {
-            ProgressView(value: progress).frame(width: 90)
-            Button("Cancel") { downloader.cancel(model) }.actionButton().controlSize(.small)
+            ProgressView(value: progress).frame(minWidth: 36, maxWidth: 90)
+            Button("Cancel") { downloader.cancel(model) }.actionButton().controlSize(.small).fixedSize()
         } else if model.isDownloaded {
-            Label { Text("Downloaded") } icon: { Icon("check", size: 11) }.font(.caption).foregroundStyle(.green)
-            Button("Delete") { confirmDelete(model) }.actionButton().controlSize(.small)
+            Label { Text("Downloaded") } icon: { Icon("check", size: 11) }.font(.caption).foregroundStyle(.green).fixedSize()
+            Button("Delete") { confirmDelete(model) }.actionButton().controlSize(.small).fixedSize()
         } else if model.url != nil {
-            Button("Download") { downloader.download(model) }.actionButton(prominent: true).controlSize(.small)
+            Button("Download") { downloader.download(model) }.actionButton(prominent: true).controlSize(.small).fixedSize()
             if model.isCustom {
-                Button("Remove") { downloader.delete(model) }.actionButton().controlSize(.small)
+                Button("Remove") { downloader.delete(model) }.actionButton().controlSize(.small).fixedSize()
             }
         } else {
-            Button("Remove") { downloader.delete(model) }.actionButton().controlSize(.small)
+            Button("Remove") { downloader.delete(model) }.actionButton().controlSize(.small).fixedSize()
         }
     }
 

@@ -33,7 +33,7 @@ final class HotkeyMonitor {
     static var hasAccessibility: Bool { AXIsProcessTrusted() }
 
     static func requestAccessibility() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
         AXIsProcessTrustedWithOptions(options)
     }
 
