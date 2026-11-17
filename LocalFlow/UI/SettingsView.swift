@@ -352,7 +352,7 @@ struct ModelList: View {
                             Text(error).font(.caption).foregroundStyle(.red)
                         }
                     }
-                    .layoutPriority(1)
+                    .layoutPriority(model.isCustom ? 0 : 1)
                     Spacer(minLength: 8)
                     trailing(model)
                 }
