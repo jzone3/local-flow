@@ -338,7 +338,7 @@ struct ModelList: View {
                     Radio(on: selected)
                     VStack(alignment: .leading, spacing: 3) {
                         HStack(spacing: 8) {
-                            Text(model.title).fontWeight(.semibold).fixedSize()
+                            Text(model.title).fontWeight(.semibold).fixedSize(horizontal: !model.isCustom, vertical: true)
                             Text(model.isCustom ? model.sizeText : "\(model.sizeText) · \(model.shortName)").font(.caption).foregroundStyle(.secondary)
                                 .lineLimit(1).truncationMode(.middle)
                             if model == WhisperModel.recommended {
